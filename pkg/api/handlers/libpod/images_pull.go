@@ -156,22 +156,48 @@ func ImagesPull(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	
+
 	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	flush()
+
+	reportCounter := 0
+	var savedReport string
 
 	enc := json.NewEncoder(w)
 	enc.SetEscapeHTML(true)
 	for {
 		var report entities.ImagePullReport
-		select {
-		case s := <-writer.Chan():
-			report.Stream = string(s)
+
+		reportStream := func() {
 			if err := enc.Encode(report); err != nil {
 				logrus.Warnf("Failed to encode json: %v", err)
 			}
 			flush()
+		}
+
+		select {
+		case s := <-writer.Chan():
+			reportCounter++
+			if reportCounter == 1 {
+				savedReport = string(s)
+				break
+			}
+			if reportCounter == 2 {
+				w.WriteHeader(http.StatusOK)
+				report.Stream = savedReport
+				reportStream()
+			}
+
+			report.Stream = string(s)
+			reportStream()
 		case <-runCtx.Done():
+			if reportCounter == 1 {
+				w.WriteHeader(http.StatusNotFound)
+				report.Stream = savedReport
+				reportStream()
+				report.Stream = ""
+			}
+
 			for _, image := range pulledImages {
 				report.Images = append(report.Images, image.ID())
 				// Pull last ID from list and publish in 'id' stanza.  This maintains previous API contract
