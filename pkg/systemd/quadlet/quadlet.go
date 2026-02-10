@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/containers/podman/v6/pkg/specgenutilexternal"
@@ -191,6 +192,8 @@ const (
 	KeyVolatileTmp           = "VolatileTmp" // deprecated
 	KeyVolume                = "Volume"
 	KeyVolumeName            = "VolumeName"
+	KeyVolumeUID             = "VolumeUID"
+	KeyVolumeGID             = "VolumeGID"
 	KeyWorkingDir            = "WorkingDir"
 	KeyYaml                  = "Yaml"
 )
@@ -359,6 +362,8 @@ var (
 				KeyType:                 true,
 				KeyUser:                 true,
 				KeyVolumeName:           true,
+				KeyVolumeUID:            true,
+				KeyVolumeGID:            true,
 			},
 		},
 		NetworkGroup: {
@@ -1101,6 +1106,15 @@ func ConvertVolume(volume *parser.UnitFile, unitsInfoMap map[string]*UnitInfo, i
 	podman := createBasePodmanCommand(volume, VolumeGroup)
 
 	podman.add("volume", "create", "--ignore")
+
+	if volume.HasKey(VolumeGroup, KeyVolumeUID) {
+		uid := volume.LookupUint32(VolumeGroup, KeyVolumeUID, 0)
+		podman.add("--uid", strconv.FormatUint(uint64(uid), 10))
+	}
+	if volume.HasKey(VolumeGroup, KeyVolumeGID) {
+		gid := volume.LookupUint32(VolumeGroup, KeyVolumeGID, 0)
+		podman.add("--gid", strconv.FormatUint(uint64(gid), 10))
+	}
 
 	driver, ok := volume.Lookup(VolumeGroup, KeyDriver)
 	if ok {
