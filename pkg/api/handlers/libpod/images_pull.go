@@ -117,15 +117,19 @@ func ImagesPull(w http.ResponseWriter, r *http.Request) {
 	if query.Quiet {
 		images, err := runtime.LibimageRuntime().Pull(r.Context(), query.Reference, pullPolicy, pullOptions)
 		var report entities.ImagePullReport
+		var errorCode int
 		if err != nil {
 			report.Error = err.Error()
+			errorCode = http.StatusNotFound
+		} else {
+			errorCode = http.StatusOK
 		}
 		for _, image := range images {
 			report.Images = append(report.Images, image.ID())
 			// Pull last ID from list and publish in 'id' stanza.  This maintains previous API contract
 			report.ID = image.ID()
 		}
-		utils.WriteResponse(w, http.StatusOK, report)
+		utils.WriteResponse(w, errorCode, report)
 		return
 	}
 
