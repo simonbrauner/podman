@@ -68,47 +68,62 @@ class ImageTestCase(APITestCase):
         self.assertEqual(r.status_code, 409, r.text)
 
     def test_pull(self):
-        r = requests.post(self.uri("/images/pull?reference=alpine"), timeout=15)
+        existing_reference = "alpine"
+        non_existing_reference = "quay.io/f4ee35641334/f6fda4bb"
+
+        def check_response_keys(r, expected):
+            text = r.text
+            keys = {key: False for key in expected}
+
+            # Read and record stanza's from pull
+            for line in str.splitlines(text):
+                obj = json.loads(line)
+                key_list = list(obj.keys())
+                for k in key_list:
+                    keys[k] = True
+
+            for key, expected in expected.items():
+                if expected:
+                    negation = ""
+                else:
+                    negation = "not "
+                self.assertEqual(keys[key], expected, f"Expected {negation}to find \"{key}\" stanza in response")
+
+        r = requests.post(self.uri(f"/images/pull?reference={existing_reference}"), timeout=15)
         self.assertEqual(r.status_code, 200, r.status_code)
-        text = r.text
-        keys = {
+        check_response_keys(r, {
             "error": False,
-            "id": False,
-            "images": False,
-            "stream": False,
-        }
-        # Read and record stanza's from pull
-        for line in str.splitlines(text):
-            obj = json.loads(line)
-            key_list = list(obj.keys())
-            for k in key_list:
-                keys[k] = True
+            "id": True,
+            "images": True,
+            "stream": True,
+        })
 
-        self.assertFalse(keys["error"], "Expected no errors")
-        self.assertTrue(keys["id"], "Expected to find id stanza")
-        self.assertTrue(keys["images"], "Expected to find images stanza")
-        self.assertTrue(keys["stream"], "Expected to find stream progress stanza's")
-
-        r = requests.post(self.uri("/images/pull?reference=alpine&quiet=true"), timeout=15)
+        r = requests.post(self.uri(f"/images/pull?reference={existing_reference}&quiet=true"), timeout=15)
         self.assertEqual(r.status_code, 200, r.status_code)
-        text = r.text
-        keys = {
+        check_response_keys(r, {
             "error": False,
-            "id": False,
-            "images": False,
+            "id": True,
+            "images": True,
             "stream": False,
-        }
-        # Read and record stanza's from pull
-        for line in str.splitlines(text):
-            obj = json.loads(line)
-            key_list = list(obj.keys())
-            for k in key_list:
-                keys[k] = True
+        })
 
-        self.assertFalse(keys["error"], "Expected no errors")
-        self.assertTrue(keys["id"], "Expected to find id stanza")
-        self.assertTrue(keys["images"], "Expected to find images stanza")
-        self.assertFalse(keys["stream"], "Expected to find stream progress stanza's")
+        r = requests.post(self.uri(f"/images/pull?reference={non_existing_reference}"))
+        # Expecting an error status code, quay.io returns 401 at the time of writing this test
+        self.assertNotEqual(r.status_code, 200, r.status_code)
+        check_response_keys(r, {
+            "cause": True,
+            "message": True,
+            "response": True,
+        })
+
+        r = requests.post(self.uri(f"/images/pull?reference={non_existing_reference}&quiet=true"))
+        # Expecting an error status code, quay.io returns 401 at the time of writing this test
+        self.assertNotEqual(r.status_code, 200, r.status_code)
+        check_response_keys(r, {
+            "cause": True,
+            "message": True,
+            "response": True,
+        })
 
     def test_create(self):
         r = requests.post(
