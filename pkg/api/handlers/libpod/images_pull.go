@@ -125,7 +125,7 @@ func ImagesPull(w http.ResponseWriter, r *http.Request) {
 			// Pull last ID from list and publish in 'id' stanza.  This maintains previous API contract
 			report.ID = image.ID()
 		}
-		utils.WriteResponse(w, http.StatusOK, report)
+		utils.WriteResponse(w, utils.HTTPStatusFromRegistryError(err), report)
 		return
 	}
 
@@ -137,6 +137,10 @@ func ImagesPull(w http.ResponseWriter, r *http.Request) {
 	writer := channel.NewWriter(make(chan []byte))
 	defer writer.Close()
 	pullOptions.Writer = writer
+
+	progress := make(chan types.ProgressProperties)
+	pullOptions.Progress = progress
+	timer := time.NewTimer(5 * time.Second)
 
 	var pulledImages []*libimage.Image
 	var pullError error
@@ -152,27 +156,57 @@ func ImagesPull(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	flush()
-
 	enc := json.NewEncoder(w)
 	enc.SetEscapeHTML(true)
-	for {
-		var report entities.ImagePullReport
-		select {
-		case s := <-writer.Chan():
-			report.Stream = string(s)
-			if err := enc.Encode(report); err != nil {
-				logrus.Warnf("Failed to encode json: %v", err)
+
+	streamingStarted := false
+	var reportBuffer []string
+
+	// Streaming is delayed to choose the status code more accurately.
+	// Once a message is streamed, it is no longer possible to change the status code.
+	startStreaming := func(statusCode int) {
+		if !streamingStarted {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(statusCode)
+
+			for _, reportMessage := range reportBuffer {
+				var report entities.ImagePullReport
+				report.Stream = reportMessage
+				if err := enc.Encode(report); err != nil {
+					logrus.Warnf("Failed to encode json: %v", err)
+				}
 			}
+			streamingStarted = true
+		}
+	}
+
+	for {
+		select {
+		case <-progress:
+			startStreaming(http.StatusOK)
 			flush()
+		case <-timer.C:
+			startStreaming(http.StatusOK)
+			flush()
+		case s := <-writer.Chan():
+			if streamingStarted {
+				var report entities.ImagePullReport
+				report.Stream = string(s)
+				if err := enc.Encode(report); err != nil {
+					logrus.Warnf("Failed to encode json: %v", err)
+				}
+				flush()
+			} else {
+				reportBuffer = append(reportBuffer, string(s))
+			}
 		case <-runCtx.Done():
+			var report entities.ImagePullReport
 			for _, image := range pulledImages {
 				report.Images = append(report.Images, image.ID())
 				// Pull last ID from list and publish in 'id' stanza.  This maintains previous API contract
 				report.ID = image.ID()
 			}
+			startStreaming(utils.HTTPStatusFromRegistryError(pullError))
 			if pullError != nil {
 				report.Error = pullError.Error()
 			}

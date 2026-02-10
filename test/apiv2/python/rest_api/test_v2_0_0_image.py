@@ -110,6 +110,40 @@ class ImageTestCase(APITestCase):
         self.assertTrue(keys["images"], "Expected to find images stanza")
         self.assertFalse(keys["stream"], "Expected to find stream progress stanza's")
 
+        r = requests.post(self.uri("/images/pull?reference=quay.io/f4ee35641334/f6fda4bb"))
+        self.assertNotEqual(r.status_code, 200, r.status_code)
+        text = r.text
+        keys = {
+            "error": False,
+            "stream": False,
+        }
+        # Read and record stanza's from pull
+        for line in str.splitlines(text):
+            obj = json.loads(line)
+            key_list = list(obj.keys())
+            for k in key_list:
+                keys[k] = True
+
+        self.assertTrue(keys["error"], "Expected errors")
+        self.assertTrue(keys["stream"], "Expected to find stream progress stanza's")
+
+        r = requests.post(self.uri("/images/pull?reference=quay.io/f4ee35641334/f6fda4bb&quiet=true"))
+        self.assertNotEqual(r.status_code, 200, r.status_code)
+        text = r.text
+        keys = {
+            "error": False,
+            "stream": False,
+        }
+        # Read and record stanza's from pull
+        for line in str.splitlines(text):
+            obj = json.loads(line)
+            key_list = list(obj.keys())
+            for k in key_list:
+                keys[k] = True
+
+        self.assertTrue(keys["error"], "Expected errors")
+        self.assertFalse(keys["stream"], "Expected not to find stream progress stanza's")
+
     def test_create(self):
         r = requests.post(
             self.podman_url + "/v1.40/images/create?fromImage=alpine&platform=linux/amd64/v8",
