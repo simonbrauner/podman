@@ -84,6 +84,8 @@ type ImagePullOptions struct {
 // ImagePullReport is the response from pulling one or more images.
 type ImagePullReport = entitiesTypes.ImagePullReport
 
+type ImagePullProgress = entitiesTypes.ImagePullProgress
+
 // ImagePushOptions are the arguments for pushing images.
 type ImagePushOptions struct {
 	// All indicates that all images referenced in a manifest list should be pushed

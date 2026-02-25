@@ -34,14 +34,15 @@ func ImagesPull(w http.ResponseWriter, r *http.Request) {
 	runtime := r.Context().Value(api.RuntimeKey).(*libpod.Runtime)
 	decoder := r.Context().Value(api.DecoderKey).(*schema.Decoder)
 	query := struct {
-		AllTags    bool   `schema:"allTags"`
-		CompatMode bool   `schema:"compatMode"`
-		PullPolicy string `schema:"policy"`
-		Quiet      bool   `schema:"quiet"`
-		Reference  string `schema:"reference"`
-		Retry      uint   `schema:"retry"`
-		RetryDelay string `schema:"retrydelay"`
-		TLSVerify  bool   `schema:"tlsVerify"`
+		AllTags      bool   `schema:"allTags"`
+		CompatMode   bool   `schema:"compatMode"`
+		PullProgress bool   `schema:"pullProgress"`
+		PullPolicy   string `schema:"policy"`
+		Quiet        bool   `schema:"quiet"`
+		Reference    string `schema:"reference"`
+		Retry        uint   `schema:"retry"`
+		RetryDelay   string `schema:"retrydelay"`
+		TLSVerify    bool   `schema:"tlsVerify"`
 		// Platform fields below:
 		Arch    string `schema:"Arch"`
 		OS      string `schema:"OS"`
@@ -56,8 +57,18 @@ func ImagesPull(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if query.Quiet && query.CompatMode {
-		utils.InternalServerError(w, errors.New("'quiet' and 'compatMode' cannot be used simultaneously"))
+	if query.CompatMode && query.PullProgress {
+		utils.InternalServerError(w, errors.New("'compatMode' and 'pullProgress' cannot be used simultaneously"))
+		return
+	}
+
+	if query.CompatMode && query.Quiet {
+		utils.InternalServerError(w, errors.New("'compatMode' and 'quiet' cannot be used simultaneously"))
+		return
+	}
+
+	if query.PullProgress && query.Quiet {
+		utils.InternalServerError(w, errors.New("'pullProgress' and 'quiet' cannot be used simultaneously"))
 		return
 	}
 
@@ -186,10 +197,42 @@ func ImagesPull(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	reportPullProgress := func(e types.ProgressProperties) {
+		var report entities.ImagePullReport
+		progress := &entities.ImagePullProgress{
+			Total:               e.Artifact.Size,
+			ProgressComponentID: e.Artifact.Digest.String(),
+		}
+		switch e.Event {
+		case types.ProgressEventNewArtifact:
+			report.Stream = "Starting to pull fs layer"
+			report.Progress = progress
+		case types.ProgressEventRead:
+			report.Stream = "Pulling fs layer"
+			report.Progress = progress
+			report.Progress.Current = e.Offset
+		case types.ProgressEventSkipped:
+			report.Stream = "Layer already exists"
+		case types.ProgressEventDone:
+			report.Stream = "Pull complete"
+			report.Progress = progress
+			report.Progress.Current = e.Offset
+			report.Progress.Completed = true
+		}
+		if err := enc.Encode(report); err != nil {
+			logrus.Errorf("Error encoding pull report: %v", err)
+			return
+		}
+		flush()
+	}
+
 	for {
 		select {
-		case <-progress:
+		case e := <-progress:
 			startStreaming() // We are reporting progress working with the image contents, so it presumably exists and it is accessible.
+			if query.PullProgress {
+				reportPullProgress(e)
+			}
 		case <-streamingDelayTimer.C:
 			startStreaming() // At some point, give up on the precise error code and let the caller show an “operation in progress, no data available yet” UI.
 		case s := <-writer.Chan():

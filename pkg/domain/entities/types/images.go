@@ -145,6 +145,15 @@ type ImagePullReport struct {
 	Images []string `json:"images,omitempty"`
 	// ID contains image id (retained for backwards compatibility)
 	ID string `json:"id,omitempty"`
+	// Progress contains the data about the progress of the pull operation
+	Progress *ImagePullProgress `json:"progress,omitempty"`
+}
+
+type ImagePullProgress struct {
+	Current             uint64 `json:"current,omitempty"`
+	Total               int64  `json:"total,omitempty"`
+	Completed           bool   `json:"completed,omitempty"`
+	ProgressComponentID string `json:"progressComponentID,omitempty"`
 }
 
 type ImagePushStream struct {
