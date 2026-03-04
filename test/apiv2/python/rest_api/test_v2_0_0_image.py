@@ -1,4 +1,5 @@
 import json
+import pytest
 import unittest
 import multiprocessing as mp
 
@@ -67,7 +68,8 @@ class ImageTestCase(APITestCase):
         r = requests.delete(self.compat_uri("images/alpine?force=true"))
         self.assertEqual(r.status_code, 409, r.text)
 
-    def test_pull(self):
+    @pytest.mark.parametrize("stream,quiet_postfix", [(False, "?quiet=True"), (True, "")])
+    def test_pull(self, stream, quiet_postfix):
         existing_reference = "alpine"
         non_existing_reference = "quay.io/f4ee35641334/f6fda4bb"
 
@@ -89,34 +91,16 @@ class ImageTestCase(APITestCase):
                     negation = "not "
                 self.assertEqual(key in keys_found, expected, f"Expected {negation}to find \"{key}\" stanza in response")
 
-        r = requests.post(self.uri(f"/images/pull?reference={existing_reference}"), timeout=15)
+        r = requests.post(self.uri(f"/images/pull?reference={existing_reference}{quiet_postfix}"), timeout=15)
         self.assertEqual(r.status_code, 200, r.status_code)
         check_response_keys(r, {
             "error": False,
             "id": True,
             "images": True,
-            "stream": True,
+            "stream": stream,
         })
 
-        r = requests.post(self.uri(f"/images/pull?reference={existing_reference}&quiet=true"), timeout=15)
-        self.assertEqual(r.status_code, 200, r.status_code)
-        check_response_keys(r, {
-            "error": False,
-            "id": True,
-            "images": True,
-            "stream": False,
-        })
-
-        r = requests.post(self.uri(f"/images/pull?reference={non_existing_reference}"))
-        # Expecting an error status code, quay.io returns 401 at the time of writing this test
-        self.assertNotEqual(r.status_code, 200, r.status_code)
-        check_response_keys(r, {
-            "cause": True,
-            "message": True,
-            "response": True,
-        })
-
-        r = requests.post(self.uri(f"/images/pull?reference={non_existing_reference}&quiet=true"))
+        r = requests.post(self.uri(f"/images/pull?reference={non_existing_reference}{quiet_postfix}"))
         # Expecting an error status code, quay.io returns 401 at the time of writing this test
         self.assertNotEqual(r.status_code, 200, r.status_code)
         check_response_keys(r, {
