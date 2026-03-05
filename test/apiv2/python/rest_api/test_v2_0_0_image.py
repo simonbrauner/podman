@@ -68,47 +68,62 @@ class ImageTestCase(APITestCase):
         self.assertEqual(r.status_code, 409, r.text)
 
     def test_pull(self):
-        r = requests.post(self.uri("/images/pull?reference=alpine"), timeout=15)
-        self.assertEqual(r.status_code, 200, r.status_code)
-        text = r.text
-        keys = {
-            "error": False,
-            "id": False,
-            "images": False,
-            "stream": False,
-        }
-        # Read and record stanza's from pull
-        for line in str.splitlines(text):
-            obj = json.loads(line)
-            key_list = list(obj.keys())
-            for k in key_list:
-                keys[k] = True
+        def check_response_keys(r, keys_expected):
+            text = r.text
+            keys_found = set()
 
-        self.assertFalse(keys["error"], "Expected no errors")
-        self.assertTrue(keys["id"], "Expected to find id stanza")
-        self.assertTrue(keys["images"], "Expected to find images stanza")
-        self.assertTrue(keys["stream"], "Expected to find stream progress stanza's")
+            # Read and record stanza's from pull
+            for line in str.splitlines(text):
+                obj = json.loads(line)
+                key_list = list(obj.keys())
+                for k in key_list:
+                    keys_found.add(k)
 
-        r = requests.post(self.uri("/images/pull?reference=alpine&quiet=true"), timeout=15)
-        self.assertEqual(r.status_code, 200, r.status_code)
-        text = r.text
-        keys = {
-            "error": False,
-            "id": False,
-            "images": False,
-            "stream": False,
-        }
-        # Read and record stanza's from pull
-        for line in str.splitlines(text):
-            obj = json.loads(line)
-            key_list = list(obj.keys())
-            for k in key_list:
-                keys[k] = True
+            for key, expected in keys_expected.items():
+                if expected:
+                    negation = ""
+                else:
+                    negation = "not "
+                self.assertEqual(
+                    key in keys_found,
+                    expected,
+                    f'Expected {negation}to find "{key}" stanza in response',
+                )
+       
+        existing_image_case = dict(
+            reference="alpine",
+            timeout=15,
+            assert_function=self.assertEqual,
+            expected_keys={"error": False, "id": True, "images": True},
+        )
+        non_existing_image_case = dict(
+            reference="quay.io/f4ee35641334/f6fda4bb",
+            timeout=None,
+            assert_function=self.assertNotEqual,
+            expected_keys={"cause": True, "message": True, "response": True},
+        )
+        image_cases = [existing_image_case, non_existing_image_case]
+        stream_cases = [
+            dict(stream=False, quiet_postfix="&quiet=True"),
+            dict(stream=True, quiet_postfix=""),
+        ]
 
-        self.assertFalse(keys["error"], "Expected no errors")
-        self.assertTrue(keys["id"], "Expected to find id stanza")
-        self.assertTrue(keys["images"], "Expected to find images stanza")
-        self.assertFalse(keys["stream"], "Expected to find stream progress stanza's")
+        cases = []
+        for image_case in image_cases:
+            for stream_case in stream_cases:
+                case = {**image_case, "quiet_postfix": stream_case["quiet_postfix"]}
+                if image_case is existing_image_case:
+                    case["expected_keys"] = {**case["expected_keys"], "stream": stream_case["stream"]}
+                cases.append(case)
+
+        for case in cases:
+            with self.subTest(case=case):
+                r = requests.post(
+                    self.uri(f"/images/pull?reference={case['reference']}{case['quiet_postfix']}"),
+                    timeout=case["timeout"],
+                )
+                case["assert_function"](r.status_code, 200, r.status_code)
+                check_response_keys(r, case["expected_keys"])
 
     def test_create(self):
         r = requests.post(
