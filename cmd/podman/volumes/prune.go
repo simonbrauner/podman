@@ -3,6 +3,7 @@ package volumes
 import (
 	"bufio"
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -48,9 +49,8 @@ func init() {
 
 func prune(cmd *cobra.Command, _ []string) error {
 	var (
-		pruneOptions  = entities.VolumePruneOptions{}
-		listOptions   = entities.VolumeListOptions{}
-		unusedOptions = entities.VolumeListOptions{}
+		pruneOptions = entities.VolumePruneOptions{}
+		listOptions  = entities.VolumeListOptions{}
 	)
 	// Prompt for confirmation if --force is not set
 	force, err := cmd.Flags().GetBool("force")
@@ -64,6 +64,11 @@ func prune(cmd *cobra.Command, _ []string) error {
 
 	// --all adds filter all=true (Docker-compatible; behavior is filter-only)
 	allFlag, _ := cmd.Flags().GetBool("all")
+	filterAllFlag := strings.EqualFold(pruneOptions.Filters.Get("all"), "true")
+	if allFlag && filterAllFlag {
+		return errors.New("--all and --filter all cannot be used together")
+	}
+	allFlag = allFlag || filterAllFlag
 	if allFlag {
 		pruneOptions.Filters.Set("all", "true")
 	}
@@ -79,32 +84,19 @@ func prune(cmd *cobra.Command, _ []string) error {
 		if err != nil {
 			return err
 		}
+
+		// List does not support all=true filter, its arguments need to be adjusted
+		delete(listOptions.Filter, "all")
+		listOptions.Filter["dangling"] = []string{"true"}
+		if !allFlag {
+			listOptions.Filter["anonymous"] = []string{"true"}
+		}
+
 		filteredVolumes, err := registry.ContainerEngine().VolumeList(context.Background(), listOptions)
 		if err != nil {
 			return err
 		}
-		var finalVolumes []*entities.VolumeListReport
-		if allFlag {
-			unusedOptions.Filter = map[string][]string{"dangling": {"true"}}
-			unusedVolumes, err := registry.ContainerEngine().VolumeList(context.Background(), unusedOptions)
-			if err != nil {
-				return err
-			}
-			finalVolumes = getIntersection(unusedVolumes, filteredVolumes)
-		} else {
-			danglingOptions := entities.VolumeListOptions{Filter: map[string][]string{"dangling": {"true"}}}
-			anonymousOptions := entities.VolumeListOptions{Filter: map[string][]string{"anonymous": {"true"}}}
-			danglingVolumes, err := registry.ContainerEngine().VolumeList(context.Background(), danglingOptions)
-			if err != nil {
-				return err
-			}
-			anonymousVolumes, err := registry.ContainerEngine().VolumeList(context.Background(), anonymousOptions)
-			if err != nil {
-				return err
-			}
-			finalVolumes = getIntersection(getIntersection(danglingVolumes, anonymousVolumes), filteredVolumes)
-		}
-		if len(finalVolumes) < 1 {
+		if len(filteredVolumes) < 1 {
 			if allFlag {
 				fmt.Println("No dangling volumes found")
 			} else {
@@ -112,7 +104,7 @@ func prune(cmd *cobra.Command, _ []string) error {
 			}
 			return nil
 		}
-		for _, fv := range finalVolumes {
+		for _, fv := range filteredVolumes {
 			fmt.Println(fv.Name)
 		}
 		fmt.Print("Are you sure you want to continue? [y/N] ")
@@ -129,18 +121,4 @@ func prune(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 	return utils.PrintVolumePruneResults(responses, false)
-}
-
-func getIntersection(a, b []*entities.VolumeListReport) []*entities.VolumeListReport {
-	var intersection []*entities.VolumeListReport
-	hash := make(map[string]bool, len(a))
-	for _, aa := range a {
-		hash[aa.Name] = true
-	}
-	for _, bb := range b {
-		if hash[bb.Name] {
-			intersection = append(intersection, bb)
-		}
-	}
-	return intersection
 }
