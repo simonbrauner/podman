@@ -918,6 +918,7 @@ go.podman.io/storage/pkg/homedir
 go.podman.io/storage/pkg/idmap
 go.podman.io/storage/pkg/idtools
 go.podman.io/storage/pkg/ioutils
+go.podman.io/storage/pkg/ioutils/atomicwriter
 go.podman.io/storage/pkg/lockfile
 go.podman.io/storage/pkg/longpath
 go.podman.io/storage/pkg/loopback

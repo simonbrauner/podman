@@ -915,6 +915,14 @@ BOGUS=foo
 		})
 	})
 
+	It("Should not leave temp files after generating service files", func() {
+		runSuccessQuadletTestCase("basic.container")
+
+		matches, err := filepath.Glob(filepath.Join(generatedDir, ".tmp-basic.service*"))
+		Expect(err).ToNot(HaveOccurred())
+		Expect(matches).To(BeEmpty())
+	})
+
 	DescribeTable("Running success quadlet test case",
 		runSuccessQuadletTestCase,
 		Entry("Basic container", "basic.container"),
