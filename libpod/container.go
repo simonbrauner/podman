@@ -127,6 +127,10 @@ type Container struct {
 	pastaResult *pasta.SetupResult
 }
 
+type Root struct {
+	path string
+}
+
 // ContainerState contains the current state of the container
 // It is stored on disk in a tmpfs and recreated on reboot
 type ContainerState struct {
@@ -141,7 +145,7 @@ type ContainerState struct {
 	Mounted bool `json:"mounted,omitempty"`
 	// Mountpoint contains the path to the container's mounted storage as given
 	// by containers/storage.
-	Mountpoint string `json:"mountPoint,omitempty"`
+	Mountpoint Root `json:"mountPoint,omitempty"`
 	// StartedTime is the time the container was started
 	StartedTime time.Time `json:"startedTime"`
 	// FinishedTime is the time the container finished executing
