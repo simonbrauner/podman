@@ -64,6 +64,16 @@ func (pr *PathRoot) PathWithoutProtection() string {
 
 Returns the underlying string, for use cases which cannot be handled by the rest of the library as of now. It deliberately has a long and discouraging name, so that it makes a person think about the alternatives before calling it, and so that it is visible in code reviews. Because every call is greppable, the full set of such bypasses stays discoverable — a basis for auditing them and for possible checks on CI.
 
+#### Logging
+
+```go
+func (pr *PathRoot) Format(f fmt.State, verb rune) {
+	fmt.Fprintf(f, fmt.FormatString(f, verb), pr.path)
+}
+```
+
+The `Stringer` interface is not implemented because it would inherently introduce a less visible alternative to `PathWithoutProtection`. To support format strings (e.g. for logging), `Formatter` is implemented instead. `Format` does not return the string, and `path := fmt.Sprintf("%s", root)` is less legitimate-looking than `path := root.String()`.
+
 ## **Use cases**
 
 <!--
