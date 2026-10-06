@@ -36,9 +36,23 @@ func NewPathRoot(path string) *PathRoot {
 }
 ```
 
+It is the responsibility of the caller to ensure that the root path is trusted.
+
+**Open idea:** should the constructor itself perform some verification/preprocessing?
+
 The constructor returns a pointer, as `nil` is a more idiomatic expression of the absence of a root than the empty string `""`. The existing `root == ""` checks get replaced with `root == nil`.
 
 **Open idea:** the constructor should not allow `path` to be an empty string, is it sensible to panic on such an attempt?
+
+#### Joining
+
+```go
+func (pr *PathRoot) Join(untrustedPath string) (string, error) {
+	return securejoin.SecureJoin(pr.path, untrustedPath)
+}
+```
+
+The general, cross-platform way to join an untrusted path onto the root, implemented by [`securejoin.SecureJoin`](https://pkg.go.dev/github.com/cyphar/filepath-securejoin#SecureJoin). It protects against non-TOCTOU (static) path traversal, but it is not TOCTOU-safe. Where a TOCTOU-safe variant exists it is generally preferred (primarily for security, possibly also for performance). `Join` is a reasonable middle ground for spots that have no TOCTOU-safe variant, or where migrating to one is deferred.
 
 ## **Use cases**
 
