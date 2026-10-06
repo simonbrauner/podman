@@ -28,6 +28,18 @@ Roots in the codebase are almost exclusively represented as strings. Keeping the
 
 - **Compiler-guided** — Once the root is retyped, the previous string operations on it (such as `filepath.Join(root, ...)`) stop compiling. The compiler errors mark every place that needs attention, no usage is forgotten.
 
+#### Constructor
+
+```go
+func NewPathRoot(path string) *PathRoot {
+	return &PathRoot{path: path}
+}
+```
+
+The constructor returns a pointer, as `nil` is a more idiomatic expression of the absence of a root than the empty string `""`. The existing `root == ""` checks get replaced with `root == nil`.
+
+**Open idea:** the constructor should not allow `path` to be an empty string, is it sensible to panic on such an attempt?
+
 ## **Use cases**
 
 <!--
