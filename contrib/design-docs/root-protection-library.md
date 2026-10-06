@@ -46,19 +46,19 @@ Please check any boxes that apply.
 For non-obvious stakeholders, you can add a brief sentence justifying after the checklist, but this is purely optional.
 -->
 - [ ] Podman Users
-- [ ] Podman Developers
+- [x] Podman Developers
 - [ ] Buildah Users
-- [ ] Buildah Developers
+- [x] Buildah Developers
 - [ ] Skopeo Users
 - [ ] Skopeo Developers
 - [ ] Podman Desktop
 - [ ] CRI-O
-- [ ] Storage library
+- [x] Storage library
 - [ ] Image library
 - [ ] Common library
 - [ ] Netavark and aardvark-dns
 
-## ** Assignee(s) **
+## **Assignee(s)**
 
 @simonbrauner
 
