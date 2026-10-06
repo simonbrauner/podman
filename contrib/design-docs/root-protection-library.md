@@ -74,10 +74,7 @@ For non-obvious stakeholders, you can add a brief sentence justifying after the 
 
 ## ** Assignee(s) **
 
-<!--
-These people will lead implementation of the feature and drive it to completion.
-This does not have to be a comprehensive list of everyone who will work on the feature, but instead just the technical lead or leads.
--->
+@simonbrauner
 
 ## **Impacts**
 
