@@ -12,10 +12,21 @@ There are known solutions, such as [securejoin.SecureJoin](https://pkg.go.dev/gi
 
 ## **Detailed Description:**
 
-<!--
-How should the feature be implemented?
-What considerations are there for the project if this is done?
--->
+### **The basic idea**
+
+#### String inside
+
+```go
+type PathRoot struct {
+	path string
+}
+```
+
+Roots in the codebase are almost exclusively represented as strings. Keeping the inner representation makes the migration **incremental** and **compiler-guided**:
+
+- **Incremental** - It is not necessary to rework the logic of the migrated site beforehand. The root (e.g. in a struct field) can be retyped, and during the migration, the surrounding code that does not yet use the type keeps working through the underlying string. The switch to `PathRoot` can therefore happen at an arbitrary layer, which also gives us the flexibility to keep a stable API where desirable.
+
+- **Compiler-guided** — Once the root is retyped, the previous string operations on it (such as `filepath.Join(root, ...)`) stop compiling. The compiler errors mark every place that needs attention, no usage is forgotten.
 
 ## **Use cases**
 
