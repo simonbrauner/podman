@@ -54,6 +54,16 @@ func (pr *PathRoot) Join(untrustedPath string) (string, error) {
 
 The general, cross-platform way to join an untrusted path onto the root, implemented by [`securejoin.SecureJoin`](https://pkg.go.dev/github.com/cyphar/filepath-securejoin#SecureJoin). It protects against non-TOCTOU (static) path traversal, but it is not TOCTOU-safe. Where a TOCTOU-safe variant exists it is generally preferred (primarily for security, possibly also for performance). `Join` is a reasonable middle ground for spots that have no TOCTOU-safe variant, or where migrating to one is deferred.
 
+#### Getting the string
+
+```go
+func (pr *PathRoot) PathWithoutProtection() string {
+	return pr.path
+}
+```
+
+Returns the underlying string, for use cases which cannot be handled by the rest of the library as of now. It deliberately has a long and discouraging name, so that it makes a person think about the alternatives before calling it, and so that it is visible in code reviews. Because every call is greppable, the full set of such bypasses stays discoverable — a basis for auditing them and for possible checks on CI.
+
 ## **Use cases**
 
 <!--
