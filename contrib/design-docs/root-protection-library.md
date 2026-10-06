@@ -25,10 +25,9 @@ One or more short descriptions of use cases of the feature once complete.
 
 ## **Target Podman Release**
 
-<!--
-When is this feature expected to be completed here?
-Are there hard deadlines to be aware of?
--->
+The scope is large and this is incremental effort, so the adoption can span multiple releases, not one in particular.
+
+In terms of hard deadlines, I personally am going to actively work on this until around mid-December 2026.
 
 ## **Link(s)**
 
