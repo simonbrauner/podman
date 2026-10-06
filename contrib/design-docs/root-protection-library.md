@@ -1,20 +1,8 @@
 # Change Request
 
-<!--
-This template is used to propose and discuss major new features to be added to Podman, Buildah, Skopeo, Netavark, and associated libraries.
-The creation of a design document prior to feature implementation is not mandatory, but is encouraged.
-Before major features are implemented, a pull request should be opened against the Podman repository with a completed version of this template.
-Discussion on the feature will occur in the pull request.
-Merging the pull request will constitute approval by project maintainers to proceed with implementation work.
-When the feature is completed and merged, this document should be removed to avoid cluttering the repository.
-It will remain in the Git history for future retrieval if necessary.
--->
-
 ## **Short Summary**
 
-<!--
-One to two sentence description of the proposal
--->
+Introduce a type which wraps a trusted root directory and offers methods that confine operations within that root.
 
 ## **Objective**
 
