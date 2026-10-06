@@ -6,10 +6,9 @@ Introduce a type which wraps a trusted root directory and offers methods that co
 
 ## **Objective**
 
-<!--
-What is this proposal trying to solve?
-Why is it necessary?
--->
+Many paths in the codebase should be interpreted within a given root, rather than in the whole filesystem. Currently, there is no unified approach to ensure this happens, and overlooking the risk may introduce path traversal vulnerabilities. A common case is the use of purely lexical joining with `filepath.Join`, as seen in [CVE-2026-55686](https://github.com/podman-container-tools/podman/security/advisories/GHSA-q6r4-3wmg-fwcq) and [CVE-2025-9566](https://github.com/podman-container-tools/podman/security/advisories/GHSA-wp3j-xq48-xpjw).
+
+There are known solutions, such as [securejoin.SecureJoin](https://pkg.go.dev/github.com/cyphar/filepath-securejoin#SecureJoin), [pathrs-lite.OpenInRoot](https://pkg.go.dev/github.com/cyphar/filepath-securejoin/pathrs-lite#OpenInRoot), [os.Root](https://pkg.go.dev/os#Root). Additionally, such operations can be implemented manually with syscalls like `openat2`, for example [chunked in c/storage](https://github.com/podman-container-tools/container-libs/blob/fa0afc2957aace7e00cece1a2fe90544a467a8cb/storage/pkg/chunked/filesystem_linux.go#L351). However, it is left to the contributor to evaluate whether the risk is there, and then to reach for the right mechanism. This proposal aims to leverage the type system to sustainably shift this dynamic: path confinement becomesthe default, and bypassing it a deliberate, visible choice.
 
 ## **Detailed Description:**
 
