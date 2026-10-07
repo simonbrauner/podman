@@ -8,7 +8,7 @@ Introduce a type which wraps a trusted root directory and offers methods that co
 
 Many paths in the codebase should be interpreted within a given root, rather than in the whole filesystem. Currently, there is no unified approach to ensure this happens, and overlooking the risk may introduce path traversal vulnerabilities. A common case is the use of purely lexical joining with `filepath.Join`, as seen in [CVE-2026-55686](https://github.com/podman-container-tools/podman/security/advisories/GHSA-q6r4-3wmg-fwcq) and [CVE-2025-9566](https://github.com/podman-container-tools/podman/security/advisories/GHSA-wp3j-xq48-xpjw).
 
-There are known solutions, such as [securejoin.SecureJoin](https://pkg.go.dev/github.com/cyphar/filepath-securejoin#SecureJoin), [pathrs-lite.OpenInRoot](https://pkg.go.dev/github.com/cyphar/filepath-securejoin/pathrs-lite#OpenInRoot), [os.Root](https://pkg.go.dev/os#Root). Additionally, such operations can be implemented manually with syscalls like `openat2`, for example [chunked in c/storage](https://github.com/podman-container-tools/container-libs/blob/fa0afc2957aace7e00cece1a2fe90544a467a8cb/storage/pkg/chunked/filesystem_linux.go#L351). However, it is left to the contributor to evaluate whether the risk is there, and then to reach for the right mechanism. This proposal aims to leverage the type system to sustainably shift this dynamic: path confinement becomesthe default, and bypassing it a deliberate, visible choice.
+There are known solutions, such as [securejoin.SecureJoin](https://pkg.go.dev/github.com/cyphar/filepath-securejoin#SecureJoin), [pathrs-lite.OpenInRoot](https://pkg.go.dev/github.com/cyphar/filepath-securejoin/pathrs-lite#OpenInRoot), [os.Root](https://pkg.go.dev/os#Root). Additionally, operations can be implemented manually with syscalls like `openat2`, for example [chunked in c/storage](https://github.com/podman-container-tools/container-libs/blob/fa0afc2957aace7e00cece1a2fe90544a467a8cb/storage/pkg/chunked/filesystem_linux.go#L351). However, it is left to the contributor to evaluate whether the risk is there, and then to reach for the right mechanism. This proposal aims to leverage the type system to sustainably shift this dynamic: path confinement becomesthe default, and bypassing it a deliberate, visible choice.
 
 ## **Detailed Description:**
 
@@ -73,6 +73,23 @@ func (pr *PathRoot) Format(f fmt.State, verb rune) {
 ```
 
 The `Stringer` interface is not implemented because it would inherently introduce a less visible alternative to `PathWithoutProtection`. To support format strings (e.g. for logging), `Formatter` is implemented instead. `Format` does not return the string, and `path := fmt.Sprintf("%s", root)` is less legitimate-looking than `path := root.String()`.
+
+### **TOCTOU-safe extensions**
+
+#### Limitations of string joining
+
+The `Join` method defined above returns a resolved string. Between resolution and usage, the state of the file system may change, and if that happens, the joined path may no longer be confined. These are TOCTOU (time-of-check to time-of-use) vulnerabilities, and eliminating them requires support from the operating system to make resolution and the operation happen atomically.
+
+#### No universal counterpart
+
+Whereas static path traversal can be mitigated universally and cross-platform through the string-based `Join`, there is no single TOCTOU-safe implementation that covers the use cases in the code base:
+
+- [os.Root](https://pkg.go.dev/os#Root) has the `RESOLVE_BENEATH` semantic, which rejects symlinks pointing outside the root, while for containers, the usual intent is `RESOLVE_IN_ROOT`, which re-roots such symlinks against the given root rather than the global `/`.
+- [pathrs-lite.OpenInRoot](https://pkg.go.dev/github.com/cyphar/filepath-securejoin/pathrs-lite#OpenInRoot) and `openat2` provide the desired resolution type, but are Linux-specific, which implies a trade-off. Either use them only in Linux-specific code, or accept lower security guarantees on other platforms.
+
+Operating on file descriptors also introduces the overhead of managing their life cycles, regardless of the underlying implementation.
+
+With these drawbacks in mind, an fd-only approach is limited to the sites where a suitable fd-based implementation is available. It risks leaving the easier-to-exploit static traversal cases unprotected while the harder cases are addressed, and still relies on a string wherever the fd-based alternative is not feasible. Establishing the string baseline first gives static-traversal safety at a lower migration cost. From there, TOCTOU safety can be adopted incrementally, driven by prioritization and by which operations each platform supports.
 
 ## **Use cases**
 
