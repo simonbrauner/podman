@@ -91,6 +91,41 @@ Operating on file descriptors also introduces the overhead of managing their lif
 
 With these drawbacks in mind, an fd-only approach is limited to the sites where a suitable fd-based implementation is available. It risks leaving the easier-to-exploit static traversal cases unprotected while the harder cases are addressed, and still relies on a string wherever the fd-based alternative is not feasible. Establishing the string baseline first gives static-traversal safety at a lower migration cost. From there, TOCTOU safety can be adopted incrementally, driven by prioritization and by which operations each platform supports.
 
+#### Placement of TOCTOU-safe methods
+
+##### a) On `PathRoot` directly
+
+For cases where only one call is needed and it is therefore simpler to just call a function.
+
+```go
+func (pr *PathRoot) OpenFile(unsafePath string, mode os.FileMode) (*os.File, error) {
+	...
+}
+```
+
+##### b) On a separate type constructed from `PathRoot`
+
+For cases where it is intended to use the operations multiple times, so that they can share one open.
+
+```go
+func (pr *PathRoot) OpenContainerRoot() (*ContainerRoot, error) {
+	...
+	return &ContainerRoot{file: file}, nil
+}
+
+type ContainerRoot struct {
+	file *os.File
+}
+
+func (cr *ContainerRoot) OpenFile(unsafePath string, mode os.FileMode) (*os.File, error) {
+	...
+}
+
+func (cr *ContainerRoot) Close() error {
+	return cr.file.Close()
+}
+```
+
 ## **Use cases**
 
 <!--
