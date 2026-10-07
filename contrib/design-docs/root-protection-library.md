@@ -126,6 +126,36 @@ func (cr *ContainerRoot) Close() error {
 }
 ```
 
+#### Duality of security guarantees
+
+Once a TOCTOU-safe operation is supported on a platform, restricting its use to the code specific to that platform would needlessly limit the reach of the security improvement, while exposing it everywhere through a single method that silently falls back to `SecureJoin` would make it unclear whether TOCTOU safety holds for a given site.
+
+The proposed solution is two explicitly named variants of each operation. The strict variant, suffixed `Concurrent`, guarantees TOCTOU safety and does not compile on unsupported platforms. The loose variant, suffixed `Racy`, is used where TOCTOU safety is not critical but still beneficial, and its implementation falls back to the string-based approach.
+
+```go
+// Only for linux
+func (pr *PathRoot) OpenFileConcurrent(unsafePath string, mode os.FileMode) (*os.File, error) {
+	...
+}
+
+// For all platforms
+func (pr *PathRoot) OpenFileRacy(unsafePath string, mode os.FileMode) (*os.File, error) {
+	if linux {
+		return pr.OpenFileConcurrent(unsafePath, mode)
+	} else {
+		path, err := pr.Join(unsafePath)
+		if err != nil {
+			return nil, err
+		}
+		...
+	}
+}
+```
+
+#### Implementation used in methods
+
+This is left open. A method can be backed by an external library (e.g. `pathrs-lite`) or self-implemented as in [chunked in c/storage](https://github.com/podman-container-tools/container-libs/blob/fa0afc2957aace7e00cece1a2fe90544a467a8cb/storage/pkg/chunked/filesystem_linux.go#L351).
+
 ## **Use cases**
 
 <!--
