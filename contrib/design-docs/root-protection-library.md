@@ -16,17 +16,23 @@ There are known solutions, such as [securejoin.SecureJoin](https://pkg.go.dev/gi
 
 #### String inside
 
+Roots in the codebase are almost exclusively represented as strings. Keeping the inner representation makes the migration **incremental** and **compiler-guided**:
+
+- **Incremental** - It is not necessary to rework the logic of the migrated site beforehand. The root (e.g. in a struct field) can be retyped, and during the migration, the surrounding code that does not yet use the type keeps working through the underlying string. The switch to `PathRoot` can therefore happen at an arbitrary layer, which also gives us the flexibility to keep a stable API where desirable.
+
+- **Compiler-guided** — Once the root is retyped, the previous string operations on it (such as `filepath.Join(root, ...)`) stop compiling. The compiler errors mark every place that needs attention, no usage is forgotten.
+
 ```go
 type PathRoot struct {
 	path string
 }
 ```
 
-Roots in the codebase are almost exclusively represented as strings. Keeping the inner representation makes the migration **incremental** and **compiler-guided**:
+The type is named `PathRoot` to:
 
-- **Incremental** - It is not necessary to rework the logic of the migrated site beforehand. The root (e.g. in a struct field) can be retyped, and during the migration, the surrounding code that does not yet use the type keeps working through the underlying string. The switch to `PathRoot` can therefore happen at an arbitrary layer, which also gives us the flexibility to keep a stable API where desirable.
-
-- **Compiler-guided** — Once the root is retyped, the previous string operations on it (such as `filepath.Join(root, ...)`) stop compiling. The compiler errors mark every place that needs attention, no usage is forgotten.
+- Make it instantly visible that it carries a path
+- Avoid confusion with `os.Root`
+- Distinguish it from another root type that could be part of the library
 
 #### Constructor
 
@@ -164,6 +170,12 @@ This is left open. A method can be backed by an external library (e.g. `pathrs-l
 - Moving the `Join` calls closer to the usage of their values, selecting a few TOCTOU-safe methods to support, and using them instead of the joined strings.
 - Continuing in whichever direction provides the most value.
 
+#### Marking the state of migration
+
+The migration cannot happen all at once, so the new type meets the rest of the codebase along a frontier. The calls that cross it belong to different stages of migration.
+
+The library records the stage with method-name suffixes. A `Todo` suffix flags a call to classify or handle in the current stage. A `Deferred` suffix flags a call that should migrate but is left for a later one. The suffix is part of the method name, so every such call is easily visible.
+
 #### Placement of the library
 
 Initially, the library with the type can reside in the codebase of the first migration, so that changes can be applied to it directly. Later on, it can move somewhere where it could be reused across the project, such as in `c/storage`.
@@ -235,9 +247,7 @@ Are there any major impacts not mentioned above?
 
 ## **Further Description (Optional):**
 
-<!--
-Is there anything not covered above that needs to be mentioned?
--->
+Naming throughout this document is open to discussion.
 
 ## **Test Descriptions (Optional):**
 
