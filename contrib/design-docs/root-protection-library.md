@@ -46,8 +46,6 @@ It is the responsibility of the caller to ensure that the root path is trusted. 
 
 The constructor returns a pointer, as `nil` is a more idiomatic expression of the absence of a root than the empty string `""`. The existing `root == ""` checks get replaced with `root == nil`.
 
-**Open idea:** the constructor should not allow `path` to be an empty string, is it sensible to panic on such an attempt?
-
 #### Joining
 
 ```go
