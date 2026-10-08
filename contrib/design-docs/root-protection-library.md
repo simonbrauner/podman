@@ -156,6 +156,14 @@ func (pr *PathRoot) OpenFileRacy(unsafePath string, mode os.FileMode) (*os.File,
 
 This is left open. A method can be backed by an external library (e.g. `pathrs-lite`) or self-implemented as in [chunked in c/storage](https://github.com/podman-container-tools/container-libs/blob/fa0afc2957aace7e00cece1a2fe90544a467a8cb/storage/pkg/chunked/filesystem_linux.go#L351).
 
+### **Logistics**
+
+#### Proposed first steps
+
+- Migration of one root to make it static path traversal safe. In the proof of concept, this is [Mountpoint in libpod](https://github.com/podman-container-tools/podman/blob/1246f0ab8e8f627fbc27790ba648d5aea614b36c/libpod/container.go#L144), but it can be a different one.
+- Moving the `Join` calls closer to the usage of their values, selecting a few TOCTOU-safe methods to support, and using them instead of the joined strings.
+- Continuing in whichever direction provides the most value.
+
 ## **Use cases**
 
 The type(s) can be applied to struct fields, variables, and function signatures that represent roots which other paths should be confined against (e.g. [Mountpoint in libpod](https://github.com/podman-container-tools/podman/blob/1246f0ab8e8f627fbc27790ba648d5aea614b36c/libpod/container.go#L144)).
