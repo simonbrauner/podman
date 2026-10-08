@@ -166,7 +166,7 @@ This is left open. A method can be backed by an external library (e.g. `pathrs-l
 
 #### Proposed first steps
 
-- Migration of one root to make it static path traversal safe. In the proof of concept, this is [Mountpoint in libpod](https://github.com/podman-container-tools/podman/blob/1246f0ab8e8f627fbc27790ba648d5aea614b36c/libpod/container.go#L144), but it can be a different one.
+- Migration of one root to make it static path traversal safe. In the [proof of concept](https://github.com/podman-container-tools/podman/pull/29871), this is [Mountpoint in libpod](https://github.com/podman-container-tools/podman/blob/1246f0ab8e8f627fbc27790ba648d5aea614b36c/libpod/container.go#L144), but it can be a different one.
 - Moving the `Join` calls closer to the usage of their values, selecting a few TOCTOU-safe methods to support, and using them instead of the joined strings.
 - Continuing in whichever direction provides the most value.
 
@@ -192,20 +192,17 @@ In terms of hard deadlines, I personally am going to actively work on this until
 
 ## **Link(s)**
 
-<!--
-A list of links to relevant context.
-This can include Github issues describing the problem, related previous pull requests, or any other links that assist in understanding this change.
-The use of non-Github issue trackers - e.g. corporate or distribution Jira or Bugzilla instances - is allowed, but we ask that all links here be publicly accessible to ensure full context is available to all.
-Including a description with each link is not mandatory but is encouraged.
--->
+- [Proof-of-concept migration](https://github.com/podman-container-tools/podman/pull/29871)
+- [CVE-2026-55686](https://github.com/podman-container-tools/podman/security/advisories/GHSA-q6r4-3wmg-fwcq)
+- [CVE-2025-9566](https://github.com/podman-container-tools/podman/security/advisories/GHSA-wp3j-xq48-xpjw)
+- [securejoin.SecureJoin](https://pkg.go.dev/github.com/cyphar/filepath-securejoin#SecureJoin)
+- [pathrs-lite.OpenInRoot](https://pkg.go.dev/github.com/cyphar/filepath-securejoin/pathrs-lite#OpenInRoot)
+- [os.Root](https://pkg.go.dev/os#Root)
+- [chunked in c/storage](https://github.com/podman-container-tools/container-libs/blob/fa0afc2957aace7e00cece1a2fe90544a467a8cb/storage/pkg/chunked/filesystem_linux.go#L351)
+- [Mountpoint in libpod](https://github.com/podman-container-tools/podman/blob/1246f0ab8e8f627fbc27790ba648d5aea614b36c/libpod/container.go#L144)
 
 ## **Stakeholders**
 
-<!--
-A list of stakeholders who will be affected by this change.
-Please check any boxes that apply.
-For non-obvious stakeholders, you can add a brief sentence justifying after the checklist, but this is purely optional.
--->
 - [ ] Podman Users
 - [x] Podman Developers
 - [ ] Buildah Users
