@@ -164,6 +164,10 @@ This is left open. A method can be backed by an external library (e.g. `pathrs-l
 - Moving the `Join` calls closer to the usage of their values, selecting a few TOCTOU-safe methods to support, and using them instead of the joined strings.
 - Continuing in whichever direction provides the most value.
 
+#### Placement of the library
+
+Initially, the library with the type can reside in the codebase of the first migration, so that changes can be applied to it directly. Later on, it can move somewhere where it could be reused across the project, such as in `c/storage`.
+
 ## **Use cases**
 
 The type(s) can be applied to struct fields, variables, and function signatures that represent roots which other paths should be confined against (e.g. [Mountpoint in libpod](https://github.com/podman-container-tools/podman/blob/1246f0ab8e8f627fbc27790ba648d5aea614b36c/libpod/container.go#L144)).
