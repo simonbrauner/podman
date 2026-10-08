@@ -222,34 +222,10 @@ In terms of hard deadlines, I personally am going to actively work on this until
 
 ## **Impacts**
 
-### **CLI**
-
-<!--
-Will there be any impact to the CLI?
-Do any options need to be added?
-Mocked output is strongly encouraged to help demonstrate the changes.
--->
-
-### **Libpod**
-
-<!--
-Will there be any changes to the core container management logic?
--->
-
-### **Others**
-
-<!--
-Are there any major impacts not mentioned above?
--->
+There shouldn't be externally visible changes for legitimate use cases, only the prevention of escapes from the root. During the migration the codebase is temporarily inconsistent, with some call sites using the type and others still passing raw strings, and the changes can cause merge conflicts with concurrent work.
 
 ## **Further Description (Optional):**
 
 Naming throughout this document is open to discussion.
 
 ## **Test Descriptions (Optional):**
-
-<!--
-How will this feature be tested?
-Detail which existing test suite or suites will be used (or, if a new suite is required, why this is necessary and how it will be implemented.
-Will this change require changes to the CI images (e.g. the inclusion of new packages) to be tested?
--->
