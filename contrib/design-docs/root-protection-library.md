@@ -229,3 +229,7 @@ There shouldn't be externally visible changes for legitimate use cases, only the
 Naming throughout this document is open to discussion.
 
 ## **Test Descriptions (Optional):**
+
+Most of the library wraps external functions that are tested by their own projects and already trusted in the codebase, so the library builds on their existing coverage. Where an operation is implemented directly instead of delegated, it gets covered by its own tests.
+
+Regressions are caught by the existing test suite, including the tests for previously fixed vulnerabilities. If a new vulnerability is discovered, a test for it can be added along with the fix.
