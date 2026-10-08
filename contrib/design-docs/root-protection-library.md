@@ -158,9 +158,7 @@ This is left open. A method can be backed by an external library (e.g. `pathrs-l
 
 ## **Use cases**
 
-<!--
-One or more short descriptions of use cases of the feature once complete.
--->
+The type(s) can be applied to struct fields, variables, and function signatures that represent roots which other paths should be confined against (e.g. [Mountpoint in libpod](https://github.com/podman-container-tools/podman/blob/1246f0ab8e8f627fbc27790ba648d5aea614b36c/libpod/container.go#L144)).
 
 ## **Target Podman Release**
 
