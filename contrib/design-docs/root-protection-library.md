@@ -220,6 +220,10 @@ In terms of hard deadlines, I personally am going to actively work on this until
 
 @simonbrauner
 
+## **Acknowledgments**
+
+Thanks to @mtrmac, @Luap99, @mheon, @TomSweeneyRedHat, and @giuseppe for the discussions and feedback that shaped this design before it was proposed upstream.
+
 ## **Impacts**
 
 There shouldn't be externally visible changes for legitimate use cases, only the prevention of escapes from the root. During the migration the codebase is temporarily inconsistent, with some call sites using the type and others still passing raw strings, and the changes can cause merge conflicts with concurrent work.
