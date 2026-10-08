@@ -87,7 +87,7 @@ Whereas static path traversal can be mitigated universally and cross-platform th
 - [os.Root](https://pkg.go.dev/os#Root) has the `RESOLVE_BENEATH` semantic, which rejects symlinks pointing outside the root, while for containers, the usual intent is `RESOLVE_IN_ROOT`, which re-roots such symlinks against the given root rather than the global `/`.
 - [pathrs-lite.OpenInRoot](https://pkg.go.dev/github.com/cyphar/filepath-securejoin/pathrs-lite#OpenInRoot) and `openat2` provide the desired resolution type, but are Linux-specific, which implies a trade-off. Either use them only in Linux-specific code, or accept lower security guarantees on other platforms.
 
-Operating on file descriptors also introduces the overhead of managing their life cycles, regardless of the underlying implementation.
+Operating on file descriptors also introduces the overhead of managing their life cycles, regardless of the underlying implementation. And a file descriptor is ephemeral, process-local state, whereas roots can be serialized and persisted.
 
 With these drawbacks in mind, an fd-only approach is limited to the sites where a suitable fd-based implementation is available. It risks leaving the easier-to-exploit static traversal cases unprotected while the harder cases are addressed, and still relies on a string wherever the fd-based alternative is not feasible. Establishing the string baseline first gives static-traversal safety at a lower migration cost. From there, TOCTOU safety can be adopted incrementally, driven by prioritization and by which operations each platform supports.
 
