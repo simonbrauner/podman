@@ -8,7 +8,7 @@ Introduce a type which wraps a trusted root directory and offers methods that co
 
 Many paths in the codebase should be interpreted within a given root, rather than in the whole filesystem. Currently, there is no unified approach to ensure this happens, and overlooking the risk may introduce path traversal vulnerabilities. A common case is the use of purely lexical joining with `filepath.Join`, as seen in [CVE-2026-55686](https://github.com/podman-container-tools/podman/security/advisories/GHSA-q6r4-3wmg-fwcq) and [CVE-2025-9566](https://github.com/podman-container-tools/podman/security/advisories/GHSA-wp3j-xq48-xpjw).
 
-There are known solutions, such as [securejoin.SecureJoin](https://pkg.go.dev/github.com/cyphar/filepath-securejoin#SecureJoin), [pathrs-lite.OpenInRoot](https://pkg.go.dev/github.com/cyphar/filepath-securejoin/pathrs-lite#OpenInRoot), [os.Root](https://pkg.go.dev/os#Root). Additionally, operations can be implemented manually with syscalls like `openat2`, for example [chunked in c/storage](https://github.com/podman-container-tools/container-libs/blob/fa0afc2957aace7e00cece1a2fe90544a467a8cb/storage/pkg/chunked/filesystem_linux.go#L351). However, it is left to the contributor to evaluate whether the risk is there, and then to reach for the right mechanism. This proposal aims to leverage the type system to sustainably shift this dynamic: path confinement becomes the default, and bypassing it a deliberate, visible choice.
+There are known solutions, such as [securejoin.SecureJoin](https://pkg.go.dev/github.com/cyphar/filepath-securejoin#SecureJoin), [pathrs-lite.OpenInRoot](https://pkg.go.dev/github.com/cyphar/filepath-securejoin/pathrs-lite#OpenInRoot), [os.Root](https://pkg.go.dev/os#Root). Additionally, operations can be implemented manually with syscalls like `openat2`, for example [chunked in c/storage](https://github.com/podman-container-tools/container-libs/blob/fa0afc2957aace7e00cece1a2fe90544a467a8cb/storage/pkg/chunked/filesystem_linux.go#L351). However, it is left to the contributor to evaluate whether the risk is there, and then to reach for the right mechanism. This proposal aims to leverage the type system to sustainably shift this dynamic: path confinement becomes the default, and bypassing it becomes a deliberate, visible choice.
 
 ## **Detailed Description:**
 
@@ -20,7 +20,7 @@ Roots in the codebase are almost exclusively represented as strings. Keeping the
 
 - **Incremental** - It is not necessary to rework the logic of the migrated site beforehand. The root (e.g. in a struct field) can be retyped, and during the migration, the surrounding code that does not yet use the type keeps working through the underlying string. The switch to `PathRoot` can therefore happen at an arbitrary layer, which also gives us the flexibility to keep a stable API where desirable.
 
-- **Compiler-guided** — Once the root is retyped, the previous string operations on it (such as `filepath.Join(root, ...)`) stop compiling. The compiler errors mark every place that needs attention, no usage is forgotten.
+- **Compiler-guided** - Once the root is retyped, the previous string operations on it (such as `filepath.Join(root, ...)`) stop compiling. The compiler errors mark every place that needs attention, so no usage is forgotten.
 
 ```go
 type PathRoot struct {
@@ -30,9 +30,9 @@ type PathRoot struct {
 
 The type is named `PathRoot` to:
 
-- Make it instantly visible that it carries a path
-- Avoid confusion with `os.Root`
-- Distinguish it from another root type that could be part of the library
+- Make it instantly visible that it carries a path.
+- Avoid confusion with `os.Root`.
+- Distinguish it from another root type that could be part of the library.
 
 #### Constructor
 
@@ -42,9 +42,7 @@ func NewPathRoot(path string) *PathRoot {
 }
 ```
 
-It is the responsibility of the caller to ensure that the root path is trusted.
-
-**Open idea:** should the constructor itself perform some verification/preprocessing?
+It is the responsibility of the caller to ensure that the root path is trusted. The constructor itself could perform some verification/preprocessing, or there could be even more constructors to cover the different needs.
 
 The constructor returns a pointer, as `nil` is a more idiomatic expression of the absence of a root than the empty string `""`. The existing `root == ""` checks get replaced with `root == nil`.
 
@@ -78,17 +76,17 @@ func (pr *PathRoot) Format(f fmt.State, verb rune) {
 }
 ```
 
-The `Stringer` interface is not implemented because it would inherently introduce a less visible alternative to `PathWithoutProtection`. To support format strings (e.g. for logging), `Formatter` is implemented instead. `Format` does not return the string, and `path := fmt.Sprintf("%s", root)` is less legitimate-looking than `path := root.String()`.
+The `Stringer` interface is not implemented because it would introduce a less visible alternative to `PathWithoutProtection`. To support format strings (e.g. for logging), `Formatter` is implemented instead. `Format` does not return the string, and `path := fmt.Sprintf("%s", root)` is less legitimate-looking than `path := root.String()`.
 
 ### **TOCTOU-safe extensions**
 
 #### Limitations of string joining
 
-The `Join` method defined above returns a resolved string. Between resolution and usage, the state of the file system may change, and if that happens, the joined path may no longer be confined. These are TOCTOU (time-of-check to time-of-use) vulnerabilities, and eliminating them requires support from the operating system to make resolution and the operation happen atomically.
+The `Join` method defined above returns a resolved string. Between resolution and usage, the state of the filesystem may change, and if that happens, the joined path may no longer be confined. These are TOCTOU (time-of-check to time-of-use) vulnerabilities, and eliminating them requires support from the operating system to make resolution and the operation happen atomically.
 
 #### No universal counterpart
 
-Whereas static path traversal can be mitigated universally and cross-platform through the string-based `Join`, there is no single TOCTOU-safe implementation that covers the use cases in the code base:
+Whereas static path traversal can be mitigated universally and cross-platform through the string-based `Join`, there is no single TOCTOU-safe implementation that covers the use cases in the codebase:
 
 - [os.Root](https://pkg.go.dev/os#Root) has the `RESOLVE_BENEATH` semantic, which rejects symlinks pointing outside the root, while for containers, the usual intent is `RESOLVE_IN_ROOT`, which re-roots such symlinks against the given root rather than the global `/`.
 - [pathrs-lite.OpenInRoot](https://pkg.go.dev/github.com/cyphar/filepath-securejoin/pathrs-lite#OpenInRoot) and `openat2` provide the desired resolution type, but are Linux-specific, which implies a trade-off. Either use them only in Linux-specific code, or accept lower security guarantees on other platforms.
@@ -101,7 +99,7 @@ With these drawbacks in mind, an fd-only approach is limited to the sites where 
 
 ##### a) On `PathRoot` directly
 
-For cases where only one call is needed and it is therefore simpler to just call a function.
+For cases where only a single call is needed.
 
 ```go
 func (pr *PathRoot) OpenFile(unsafePath string, mode os.FileMode) (*os.File, error) {
@@ -111,7 +109,7 @@ func (pr *PathRoot) OpenFile(unsafePath string, mode os.FileMode) (*os.File, err
 
 ##### b) On a separate type constructed from `PathRoot`
 
-For cases where it is intended to use the operations multiple times, so that they can share one open.
+For cases where the operations are used multiple times, so that they can share one open.
 
 ```go
 func (pr *PathRoot) OpenContainerRoot() (*ContainerRoot, error) {
@@ -178,7 +176,7 @@ The library records the stage with method-name suffixes. A `Todo` suffix flags a
 
 #### Placement of the library
 
-Initially, the library with the type can reside in the codebase of the first migration, so that changes can be applied to it directly. Later on, it can move somewhere where it could be reused across the project, such as in `c/storage`.
+Initially, the library with the type can reside in the codebase of the first migration, so that changes can be applied to it directly. Later on, it can move somewhere it can be reused across the project, such as in `c/storage`.
 
 ## **Use cases**
 
@@ -188,7 +186,7 @@ The type(s) can be applied to struct fields, variables, and function signatures 
 
 The scope is large and this is incremental effort, so the adoption can span multiple releases, not one in particular.
 
-In terms of hard deadlines, I personally am going to actively work on this until around mid-December 2026.
+In terms of deadlines, I intend to actively work on this until around mid-December 2026.
 
 ## **Link(s)**
 
