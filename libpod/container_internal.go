@@ -621,7 +621,7 @@ func (c *Container) teardownStorage() error {
 func resetContainerState(state *ContainerState) {
 	state.PID = 0
 	state.ConmonPID = 0
-	state.Mountpoint = ""
+	state.Mountpoint = nil
 	state.Mounted = false
 	// Reset state.
 	// Almost all states are reset to either Configured or Exited,
@@ -778,8 +778,10 @@ func (c *Container) removeConmonFiles() error {
 }
 
 func (c *Container) export(out io.Writer) error {
-	mountPoint := c.state.Mountpoint
-	if !c.state.Mounted {
+	var mountPoint string
+	if c.state.Mounted {
+		mountPoint = c.state.Mountpoint.PathWithoutProtectionDeferred()
+	} else {
 		containerMount, err := c.runtime.store.Mount(c.ID(), c.config.MountLabel)
 		if err != nil {
 			return fmt.Errorf("mounting container %q: %w", c.ID(), err)
@@ -1761,10 +1763,10 @@ func (c *Container) mountStorage(ctx context.Context) (_ string, deferredErr err
 	if c.state.Mounted {
 		mounted := true
 		if c.ensureState(define.ContainerStateExited) {
-			mounted, _ = mount.Mounted(c.state.Mountpoint)
+			mounted, _ = mount.Mounted(c.state.Mountpoint.PathWithoutProtectionDeferred())
 		}
 		if mounted {
-			return c.state.Mountpoint, nil
+			return c.state.Mountpoint.PathWithoutProtectionTodo(), nil
 		}
 	}
 
@@ -2097,7 +2099,7 @@ func (c *Container) cleanupStorage() error {
 	}
 
 	markUnmounted := func() {
-		c.state.Mountpoint = ""
+		c.state.Mountpoint = nil
 		c.state.Mounted = false
 
 		if c.valid {
@@ -2109,7 +2111,7 @@ func (c *Container) cleanupStorage() error {
 
 	// umount rootfs overlay if it was created
 	if c.config.RootfsOverlay {
-		overlayBasePath := filepath.Dir(c.state.Mountpoint)
+		overlayBasePath := filepath.Dir(c.state.Mountpoint.PathWithoutProtection())
 		if err := overlay.Unmount(overlayBasePath); err != nil {
 			reportErrorf("failed to clean up overlay mounts for %s: %w", c.ID(), err)
 		}
@@ -2573,7 +2575,7 @@ func (c *Container) setupOCIHooks(ctx context.Context, config *spec.Spec) (map[s
 // Otherwise, it returns an intermediate mountpoint that is accessible to anyone.
 func (c *Container) getRootPathForOCI() (string, error) {
 	if hasCurrentUserMapped(c) || c.config.RootfsMapping != nil {
-		return c.state.Mountpoint, nil
+		return c.state.Mountpoint.PathWithoutProtectionTodo(), nil
 	}
 	return c.getIntermediateMountpointUser()
 }

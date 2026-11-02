@@ -13,6 +13,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 	"go.podman.io/common/pkg/resize"
+	"go.podman.io/podman/v6/internal/protectedroot"
 	"go.podman.io/podman/v6/libpod/define"
 	"go.podman.io/podman/v6/libpod/events"
 	"go.podman.io/podman/v6/pkg/domain/entities"
@@ -1276,12 +1277,15 @@ func (c *Container) Stat(ctx context.Context, containerPath string) (*define.Fil
 		}
 	}
 
-	var mountPoint string
-	var err error
+	var mountPoint protectedroot.PathRoot
 	if c.state.Mounted {
-		mountPoint = c.state.Mountpoint
+		mountPoint = *c.state.Mountpoint
 	} else {
-		mountPoint, err = c.mount()
+		mountPointPath, err := c.mount()
+		if err != nil {
+			return nil, err
+		}
+		mountPoint, err = protectedroot.NewPathRootTodo(mountPointPath)
 		if err != nil {
 			return nil, err
 		}
@@ -1292,7 +1296,7 @@ func (c *Container) Stat(ctx context.Context, containerPath string) (*define.Fil
 		}()
 	}
 
-	info, resolved, err := c.stat(ctx, mountPoint, containerPath)
+	info, resolved, err := c.stat(ctx, mountPoint.PathWithoutProtectionTodo(), containerPath)
 	resolved.close()
 	return info, err
 }

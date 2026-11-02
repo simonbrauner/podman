@@ -17,6 +17,7 @@ import (
 	"github.com/opencontainers/runtime-tools/generate"
 	"github.com/sirupsen/logrus"
 	"go.podman.io/common/libnetwork/types"
+	"go.podman.io/podman/v6/internal/protectedroot"
 	"go.podman.io/podman/v6/pkg/rootless"
 	"golang.org/x/sys/unix"
 )
@@ -39,7 +40,6 @@ func (c *Container) prepare(ctx context.Context) error {
 		ctrNS                           string
 		networkStatus                   map[string]types.StatusBlock
 		createNetNSErr, mountStorageErr error
-		mountPoint                      string
 		tmpStateLock                    sync.Mutex
 	)
 
@@ -70,8 +70,14 @@ func (c *Container) prepare(ctx context.Context) error {
 	// Mount storage if not mounted
 	go func() {
 		defer wg.Done()
-		mountPoint, mountStorageErr = c.mountStorage(ctx)
 
+		var mountPointPath string
+		mountPointPath, mountStorageErr = c.mountStorage(ctx)
+		if mountStorageErr != nil {
+			return
+		}
+		var mountPoint protectedroot.PathRoot
+		mountPoint, mountStorageErr = protectedroot.NewPathRootTodo(mountPointPath)
 		if mountStorageErr != nil {
 			return
 		}
@@ -81,7 +87,7 @@ func (c *Container) prepare(ctx context.Context) error {
 
 		// Finish up mountStorage
 		c.state.Mounted = true
-		c.state.Mountpoint = mountPoint
+		c.state.Mountpoint = &mountPoint
 
 		logrus.Debugf("Created root filesystem for container %s at %s", c.ID(), c.state.Mountpoint)
 	}()
