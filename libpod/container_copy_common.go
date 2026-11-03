@@ -208,7 +208,7 @@ func (c *Container) copyFromArchive(ctx context.Context, path string, chown, noO
 	var idPair *idtools.IDPair
 	if chown {
 		// Make sure we chown the files to the container's main user and group ID.
-		user, err := getContainerUser(c, mountPoint.PathWithoutProtectionTodo())
+		user, err := getContainerUser(c, mountPoint)
 		if err != nil {
 			cleanup()
 			return nil, err
@@ -288,7 +288,7 @@ func (c *Container) copyToArchive(ctx context.Context, path string, writer io.Wr
 	// We optimistically chown to the host user.  In case of a hypothetical
 	// container-to-container copy, the reading side will chown back to the
 	// container user.
-	user, err := getContainerUser(c, mountPoint.PathWithoutProtectionTodo())
+	user, err := getContainerUser(c, mountPoint)
 	if err != nil {
 		cleanup()
 		return nil, err
@@ -332,10 +332,10 @@ func (c *Container) copyToArchive(ctx context.Context, path string, writer io.Wr
 }
 
 // getContainerUser returns the specs.User and ID mappings of the container.
-func getContainerUser(container *Container, mountPoint string) (specs.User, error) {
+func getContainerUser(container *Container, mountPoint protectedroot.PathRoot) (specs.User, error) {
 	userspec := container.config.User
 
-	uid, gid, _, err := chrootuser.GetUser(mountPoint, userspec)
+	uid, gid, _, err := chrootuser.GetUser(mountPoint.PathWithoutProtectionDeferred(), userspec)
 	u := specs.User{
 		UID:      uid,
 		GID:      gid,
@@ -343,7 +343,7 @@ func getContainerUser(container *Container, mountPoint string) (specs.User, erro
 	}
 
 	if !strings.Contains(userspec, ":") {
-		groups, err2 := chrootuser.GetAdditionalGroupsForUser(mountPoint, uint64(u.UID))
+		groups, err2 := chrootuser.GetAdditionalGroupsForUser(mountPoint.PathWithoutProtectionDeferred(), uint64(u.UID))
 		if err2 != nil {
 			if !errors.Is(err2, chrootuser.ErrNoSuchUser) && err == nil {
 				err = err2
