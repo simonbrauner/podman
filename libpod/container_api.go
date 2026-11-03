@@ -490,7 +490,11 @@ func (c *Container) Mount() (string, error) {
 	}
 
 	defer c.newContainerEvent(events.Mount)
-	return c.mount()
+	mountPoint, err := c.mount()
+	if err != nil {
+		return "", err
+	}
+	return mountPoint.PathWithoutProtection(), nil // Public API
 }
 
 // Unmount unmounts a container's filesystem on the host
@@ -1277,15 +1281,12 @@ func (c *Container) Stat(ctx context.Context, containerPath string) (*define.Fil
 		}
 	}
 
-	var mountPoint protectedroot.PathRoot
+	var mountPoint *protectedroot.PathRoot
+	var err error
 	if c.state.Mounted {
-		mountPoint = *c.state.Mountpoint
+		mountPoint = c.state.Mountpoint
 	} else {
-		mountPointPath, err := c.mount()
-		if err != nil {
-			return nil, err
-		}
-		mountPoint, err = protectedroot.NewPathRootTodo(mountPointPath)
+		mountPoint, err = c.mount()
 		if err != nil {
 			return nil, err
 		}

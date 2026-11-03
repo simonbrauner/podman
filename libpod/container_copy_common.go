@@ -27,9 +27,10 @@ import (
 
 func (c *Container) copyFromArchive(ctx context.Context, path string, chown, noOverwriteDirNonDir bool, rename map[string]string, reader io.Reader) (func() error, error) {
 	var (
-		mountPoint   protectedroot.PathRoot
+		mountPoint   *protectedroot.PathRoot
 		unmount      func()
 		cleanupFuncs []func()
+		err          error
 		locked       = true
 	)
 
@@ -41,19 +42,15 @@ func (c *Container) copyFromArchive(ctx context.Context, path string, chown, noO
 
 	// Optimization: only mount if the container is not already.
 	if c.state.Mounted {
-		mountPoint = *c.state.Mountpoint
+		mountPoint = c.state.Mountpoint
 		unmount = func() {}
 	} else {
 		// NOTE: make sure to unmount in error paths.
-		mountPointPath, err := c.mount()
+		mountPoint, err = c.mount()
 		if err != nil {
 			return nil, err
 		}
-		mountPoint, err = protectedroot.NewPathRootTodo(mountPointPath)
-		if err != nil {
-			return nil, err
-		}
-		c.state.Mountpoint = &mountPoint
+		c.state.Mountpoint = mountPoint
 		if err := c.save(); err != nil {
 			return nil, err
 		}
@@ -96,7 +93,7 @@ func (c *Container) copyFromArchive(ctx context.Context, path string, chown, noO
 		// containers that have never started.
 		if len(c.config.NamedVolumes) > 0 {
 			for _, v := range c.config.NamedVolumes {
-				vol, err := c.mountNamedVolume(ctx, v, mountPoint)
+				vol, err := c.mountNamedVolume(ctx, v, *mountPoint)
 				if err != nil {
 					unmount()
 					return nil, err
@@ -208,7 +205,7 @@ func (c *Container) copyFromArchive(ctx context.Context, path string, chown, noO
 	var idPair *idtools.IDPair
 	if chown {
 		// Make sure we chown the files to the container's main user and group ID.
-		user, err := getContainerUser(c, mountPoint)
+		user, err := getContainerUser(c, *mountPoint)
 		if err != nil {
 			cleanup()
 			return nil, err
@@ -249,21 +246,18 @@ func (c *Container) copyFromArchive(ctx context.Context, path string, chown, noO
 
 func (c *Container) copyToArchive(ctx context.Context, path string, writer io.Writer) (func() error, error) {
 	var (
-		mountPoint protectedroot.PathRoot
+		mountPoint *protectedroot.PathRoot
 		unmount    func()
+		err        error
 	)
 
 	// Optimization: only mount if the container is not already.
 	if c.state.Mounted {
-		mountPoint = *c.state.Mountpoint
+		mountPoint = c.state.Mountpoint
 		unmount = func() {}
 	} else {
 		// NOTE: make sure to unmount in error paths.
-		mountPointPath, err := c.mount()
-		if err != nil {
-			return nil, err
-		}
-		mountPoint, err = protectedroot.NewPathRootTodo(mountPointPath)
+		mountPoint, err = c.mount()
 		if err != nil {
 			return nil, err
 		}
@@ -288,7 +282,7 @@ func (c *Container) copyToArchive(ctx context.Context, path string, writer io.Wr
 	// We optimistically chown to the host user.  In case of a hypothetical
 	// container-to-container copy, the reading side will chown back to the
 	// container user.
-	user, err := getContainerUser(c, mountPoint)
+	user, err := getContainerUser(c, *mountPoint)
 	if err != nil {
 		cleanup()
 		return nil, err

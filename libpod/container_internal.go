@@ -1876,10 +1876,12 @@ func (c *Container) mountStorage(ctx context.Context) (_ *protectedroot.PathRoot
 	}
 
 	if mountPoint == "" {
-		mountPoint, err = c.mount()
+		var mountPointPathRoot *protectedroot.PathRoot
+		mountPointPathRoot, err = c.mount()
 		if err != nil {
 			return nil, err
 		}
+		mountPoint = mountPointPathRoot.PathWithoutProtectionTodo()
 		defer func() {
 			if deferredErr != nil {
 				if err := c.unmount(false); err != nil {
@@ -2649,23 +2651,27 @@ func (c *Container) getIntermediateMountpointUser() (string, error) {
 }
 
 // mount mounts the container's root filesystem
-func (c *Container) mount() (string, error) {
+func (c *Container) mount() (*protectedroot.PathRoot, error) {
 	if c.state.State == define.ContainerStateRemoving {
-		return "", fmt.Errorf("cannot mount container %s as it is being removed: %w", c.ID(), define.ErrCtrStateInvalid)
+		return nil, fmt.Errorf("cannot mount container %s as it is being removed: %w", c.ID(), define.ErrCtrStateInvalid)
 	}
 
 	mountPoint, err := c.runtime.storageService.MountContainerImage(c.ID())
 	if err != nil {
-		return "", fmt.Errorf("mounting storage for container %s: %w", c.ID(), err)
+		return nil, fmt.Errorf("mounting storage for container %s: %w", c.ID(), err)
 	}
 	mountPoint, err = filepath.EvalSymlinks(mountPoint)
 	if err != nil {
-		return "", fmt.Errorf("resolving storage path for container %s: %w", c.ID(), err)
+		return nil, fmt.Errorf("resolving storage path for container %s: %w", c.ID(), err)
 	}
 	if err := idtools.SafeChown(mountPoint, c.RootUID(), c.RootGID()); err != nil {
-		return "", fmt.Errorf("cannot chown %s to %d:%d: %w", mountPoint, c.RootUID(), c.RootGID(), err)
+		return nil, fmt.Errorf("cannot chown %s to %d:%d: %w", mountPoint, c.RootUID(), c.RootGID(), err)
 	}
-	return mountPoint, nil
+	mountPointRoot, err := protectedroot.NewPathRootTodo(mountPoint)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create mountpoint %s for container %s: %w", mountPoint, c.ID(), err)
+	}
+	return &mountPointRoot, nil
 }
 
 // unmount unmounts the container's root filesystem
