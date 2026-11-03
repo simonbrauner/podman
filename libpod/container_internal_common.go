@@ -1230,7 +1230,7 @@ func (c *Container) exportCheckpoint(options ContainerCheckpointOptions) error {
 			return fmt.Errorf("exporting root file-system diff for %q: %w", c.ID(), err)
 		}
 
-		addToTarFiles, err = crutils.CRCreateRootFsDiffTar(&rootFsChanges, c.state.Mountpoint.PathWithoutProtectionTodo(), c.bundlePath())
+		addToTarFiles, err = crutils.CRCreateRootFsDiffTar(&rootFsChanges, *c.state.Mountpoint, c.bundlePath())
 		if err != nil {
 			return err
 		}
@@ -1923,11 +1923,11 @@ func (c *Container) restore(ctx context.Context, options ContainerCheckpointOpti
 
 	// Before actually restarting the container, apply the root file-system changes
 	if !options.IgnoreRootfs {
-		if err := crutils.CRApplyRootFsDiffTar(c.bundlePath(), c.state.Mountpoint.PathWithoutProtectionTodo()); err != nil {
+		if err := crutils.CRApplyRootFsDiffTar(c.bundlePath(), *c.state.Mountpoint); err != nil {
 			return nil, 0, err
 		}
 
-		if err := crutils.CRRemoveDeletedFiles(c.ID(), c.bundlePath(), c.state.Mountpoint.PathWithoutProtectionTodo()); err != nil {
+		if err := crutils.CRRemoveDeletedFiles(c.ID(), c.bundlePath(), *c.state.Mountpoint); err != nil {
 			return nil, 0, err
 		}
 	}
