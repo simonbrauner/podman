@@ -37,6 +37,7 @@ import (
 	"go.podman.io/common/pkg/hooks/exec"
 	"go.podman.io/common/pkg/timezone"
 	cutil "go.podman.io/common/pkg/util"
+	"go.podman.io/podman/v6/internal/protectedroot"
 	"go.podman.io/podman/v6/libpod/define"
 	"go.podman.io/podman/v6/libpod/events"
 	"go.podman.io/podman/v6/libpod/shutdown"
@@ -1855,7 +1856,11 @@ func (c *Container) mountStorage(ctx context.Context) (_ string, deferredErr err
 		}
 
 		mountPoint = overlayMount.Source
-		execUser, err := lookup.GetUserGroupInfo(mountPoint, c.config.User, nil)
+		mountPointPathRoot, err := protectedroot.NewPathRootTodo(mountPoint)
+		if err != nil {
+			return "", err
+		}
+		execUser, err := lookup.GetUserGroupInfo(mountPointPathRoot, c.config.User, nil)
 		if err != nil {
 			return "", err
 		}

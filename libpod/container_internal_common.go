@@ -252,7 +252,7 @@ func (c *Container) generateSpec(ctx context.Context) (s *spec.Spec, cleanupFunc
 	}
 
 	overrides := c.getUserOverrides()
-	execUser, err := lookup.GetUserGroupInfo(c.state.Mountpoint.PathWithoutProtectionTodo(), c.config.User, overrides)
+	execUser, err := lookup.GetUserGroupInfo(*c.state.Mountpoint, c.config.User, overrides)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -687,7 +687,7 @@ func (c *Container) generateSpec(ctx context.Context) (s *spec.Spec, cleanupFunc
 
 	// Add addition groups if c.config.GroupAdd is not empty
 	if len(c.config.Groups) > 0 {
-		gids, err := lookup.GetContainerGroups(c.config.Groups, c.state.Mountpoint.PathWithoutProtectionTodo(), overrides)
+		gids, err := lookup.GetContainerGroups(c.config.Groups, *c.state.Mountpoint, overrides)
 		if err != nil {
 			return nil, nil, fmt.Errorf("looking up supplemental groups for container %s: %w", c.ID(), err)
 		}
@@ -2612,13 +2612,13 @@ func (c *Container) generateCurrentUserGroupEntry() (string, int, error) {
 	}
 
 	// Look up group name to see if it exists in the image.
-	_, err = lookup.GetGroup(c.state.Mountpoint.PathWithoutProtectionTodo(), g.Name)
+	_, err = lookup.GetGroup(*c.state.Mountpoint, g.Name)
 	if !errors.Is(err, runcuser.ErrNoGroupEntries) {
 		return "", 0, err
 	}
 
 	// Look up GID to see if it exists in the image.
-	_, err = lookup.GetGroup(c.state.Mountpoint.PathWithoutProtectionTodo(), g.Gid)
+	_, err = lookup.GetGroup(*c.state.Mountpoint, g.Gid)
 	if !errors.Is(err, runcuser.ErrNoGroupEntries) {
 		return "", 0, err
 	}
@@ -2662,7 +2662,7 @@ func (c *Container) generateUserGroupEntry(addedGID int) (string, error) {
 	}
 
 	// Check if the group already exists
-	g, err := lookup.GetGroup(c.state.Mountpoint.PathWithoutProtectionTodo(), group)
+	g, err := lookup.GetGroup(*c.state.Mountpoint, group)
 	if !errors.Is(err, runcuser.ErrNoGroupEntries) {
 		return "", err
 	}
@@ -2755,7 +2755,7 @@ func (c *Container) generateCurrentUserPasswdEntry() (string, int, int, error) {
 func (c *Container) setHomeEnvIfNeeded() error {
 	getExecUserHome := func() (string, error) {
 		overrides := c.getUserOverrides()
-		execUser, err := lookup.GetUserGroupInfo(c.state.Mountpoint.PathWithoutProtectionTodo(), c.config.User, overrides)
+		execUser, err := lookup.GetUserGroupInfo(*c.state.Mountpoint, c.config.User, overrides)
 		if err != nil {
 			if slices.Contains(c.config.HostUsers, c.config.User) {
 				execUser, err = lookupHostUser(c.config.User)
@@ -2787,13 +2787,13 @@ func (c *Container) setHomeEnvIfNeeded() error {
 
 func (c *Container) userPasswdEntry(u *user.User) (string, error) {
 	// Look up the user to see if it exists in the container image.
-	_, err := lookup.GetUser(c.state.Mountpoint.PathWithoutProtectionTodo(), u.Username)
+	_, err := lookup.GetUser(*c.state.Mountpoint, u.Username)
 	if !errors.Is(err, runcuser.ErrNoPasswdEntries) {
 		return "", err
 	}
 
 	// Look up the UID to see if it exists in the container image.
-	_, err = lookup.GetUser(c.state.Mountpoint.PathWithoutProtectionTodo(), u.Uid)
+	_, err = lookup.GetUser(*c.state.Mountpoint, u.Uid)
 	if !errors.Is(err, runcuser.ErrNoPasswdEntries) {
 		return "", err
 	}
@@ -2852,7 +2852,7 @@ func (c *Container) generateUserPasswdEntry(addedUID int) (string, error) {
 	}
 
 	// Look up the user to see if it exists in the container image
-	_, err = lookup.GetUser(c.state.Mountpoint.PathWithoutProtectionTodo(), userspec)
+	_, err = lookup.GetUser(*c.state.Mountpoint, userspec)
 	if !errors.Is(err, runcuser.ErrNoPasswdEntries) {
 		return "", err
 	}
@@ -2862,7 +2862,7 @@ func (c *Container) generateUserPasswdEntry(addedUID int) (string, error) {
 		if err == nil {
 			gid = int(ugid)
 		} else {
-			group, err := lookup.GetGroup(c.state.Mountpoint.PathWithoutProtectionTodo(), groupspec)
+			group, err := lookup.GetGroup(*c.state.Mountpoint, groupspec)
 			if err != nil {
 				return "", fmt.Errorf("unable to get gid %s from group file: %w", groupspec, err)
 			}
