@@ -623,7 +623,7 @@ func (c *Container) generateSpec(ctx context.Context) (s *spec.Spec, cleanupFunc
 				return nil, nil, err
 			}
 
-			destIsFile, err := containerPathIsFile(c.state.Mountpoint.PathWithoutProtectionTodo(), artifactMount.Dest)
+			destIsFile, err := containerPathIsFile(*c.state.Mountpoint, artifactMount.Dest)
 			// When the file does not exists and the artifact has only a single blob to mount
 			// assume it is a file so we use the dest path as direct mount.
 			if err != nil && len(paths) == 1 && errors.Is(err, fs.ErrNotExist) {

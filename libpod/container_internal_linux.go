@@ -742,8 +742,9 @@ var hasCapSysResource = sync.OnceValues(func() (bool, error) {
 })
 
 // containerPathIsFile returns true if the given containerPath is a file
-func containerPathIsFile(unsafeRoot string, containerPath string) (bool, error) {
-	f, err := pathrs.OpenInRoot(unsafeRoot, containerPath)
+func containerPathIsFile(root protectedroot.PathRoot, containerPath string) (bool, error) {
+	rootPath := root.PathWithoutProtection() // TODO replace once `PathRoot` provides `OpenInRoot`
+	f, err := pathrs.OpenInRoot(rootPath, containerPath)
 	if err != nil {
 		return false, err
 	}

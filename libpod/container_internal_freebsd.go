@@ -415,11 +415,11 @@ func hasCapSysResource() (bool, error) {
 }
 
 // containerPathIsFile returns true if the given containerPath is a file
-func containerPathIsFile(unsafeRoot string, containerPath string) (bool, error) {
+func containerPathIsFile(root protectedroot.PathRoot, containerPath string) (bool, error) {
 	// Note freebsd does not have support for OpenInRoot() so us the less safe way
 	// with the old SecureJoin(), but given this is only called before the container
 	// is started it is not subject to race conditions with the container process.
-	path, err := securejoin.SecureJoin(unsafeRoot, containerPath)
+	path, err := root.Join(containerPath)
 	if err != nil {
 		return false, err
 	}
