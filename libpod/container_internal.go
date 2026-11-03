@@ -1939,9 +1939,14 @@ func (c *Container) mountStorage(ctx context.Context) (_ *protectedroot.PathRoot
 		c.state.BindMounts["/etc/localtime"] = localTimePath
 	}
 
+	mountPointPathRoot, err := protectedroot.NewPathRootTodo(mountPoint)
+	if err != nil {
+		return nil, err
+	}
+
 	// Request a mount of all named volumes
 	for _, v := range c.config.NamedVolumes {
-		vol, err := c.mountNamedVolume(ctx, v, mountPoint)
+		vol, err := c.mountNamedVolume(ctx, v, mountPointPathRoot)
 		if err != nil {
 			return nil, err
 		}
@@ -1957,11 +1962,6 @@ func (c *Container) mountStorage(ctx context.Context) (_ *protectedroot.PathRoot
 		}()
 	}
 
-	mountPointPathRoot, err := protectedroot.NewPathRootTodo(mountPoint)
-	if err != nil {
-		return nil, err
-	}
-
 	return &mountPointPathRoot, nil
 }
 
@@ -1970,7 +1970,7 @@ func (c *Container) mountStorage(ctx context.Context) (_ *protectedroot.PathRoot
 // Does not verify that the name volume given is actually present in container
 // config.
 // Returns the volume that was mounted.
-func (c *Container) mountNamedVolume(ctx context.Context, v *ContainerNamedVolume, mountpoint string) (*Volume, error) {
+func (c *Container) mountNamedVolume(ctx context.Context, v *ContainerNamedVolume, mountpoint protectedroot.PathRoot) (*Volume, error) {
 	logrus.Debugf("Going to mount named volume %s", v.Name)
 	vol, err := c.runtime.state.Volume(v.Name)
 	if err != nil {
@@ -1995,7 +1995,7 @@ func (c *Container) mountNamedVolume(ctx context.Context, v *ContainerNamedVolum
 	if vol.state.NeedsCopyUp && !slices.Contains(v.Options, "nocopy") && !hasNoCopy {
 		logrus.Debugf("Copying up contents from container %s to volume %s", c.ID(), vol.Name())
 
-		srcDir, err := securejoin.SecureJoin(mountpoint, v.Dest)
+		srcDir, err := mountpoint.Join(v.Dest)
 		if err != nil {
 			return nil, fmt.Errorf("calculating destination path to copy up container %s volume %s: %w", c.ID(), vol.Name(), err)
 		}

@@ -96,7 +96,7 @@ func (c *Container) copyFromArchive(ctx context.Context, path string, chown, noO
 		// containers that have never started.
 		if len(c.config.NamedVolumes) > 0 {
 			for _, v := range c.config.NamedVolumes {
-				vol, err := c.mountNamedVolume(ctx, v, mountPoint.PathWithoutProtectionTodo())
+				vol, err := c.mountNamedVolume(ctx, v, mountPoint)
 				if err != nil {
 					unmount()
 					return nil, err
