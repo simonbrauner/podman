@@ -21,7 +21,6 @@ import (
 
 	metadata "github.com/checkpoint-restore/checkpointctl/lib"
 	"github.com/coreos/go-systemd/v22/daemon"
-	securejoin "github.com/cyphar/filepath-securejoin"
 	spec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/opencontainers/runtime-tools/generate"
 	"github.com/opencontainers/selinux/go-selinux"
@@ -1797,7 +1796,10 @@ func (c *Container) mountStorage(ctx context.Context) (_ *protectedroot.PathRoot
 
 	// We need to mount the container before volumes - to ensure the copyup
 	// works properly.
-	mountPoint := c.config.Rootfs
+	mountPoint, err := protectedroot.NewOptionalPathRootDeferred(c.config.Rootfs)
+	if err != nil {
+		return nil, err
+	}
 
 	if c.config.RootfsMapping != nil {
 		uidMappings, gidMappings, err := parseIDMapMountOption(c.config.IDMappings, *c.config.RootfsMapping)
@@ -1855,12 +1857,14 @@ func (c *Container) mountStorage(ctx context.Context) (_ *protectedroot.PathRoot
 			}
 		}
 
-		mountPoint = overlayMount.Source
-		mountPointPathRoot, err := protectedroot.NewPathRootTodo(mountPoint)
+		var mp protectedroot.PathRoot
+		mp, err = protectedroot.NewPathRootDeferred(overlayMount.Source)
 		if err != nil {
 			return nil, err
 		}
-		execUser, err := lookup.GetUserGroupInfo(mountPointPathRoot, c.config.User, nil)
+		mountPoint = &mp
+
+		execUser, err := lookup.GetUserGroupInfo(*mountPoint, c.config.User, nil)
 		if err != nil {
 			return nil, err
 		}
@@ -1870,18 +1874,16 @@ func (c *Container) mountStorage(ctx context.Context) (_ *protectedroot.PathRoot
 		}
 
 		// note: this should not be recursive, if using external rootfs users should be responsible on configuring ownership.
-		if err := chown.ChangeHostPathOwnership(mountPoint, false, int(hostUID), int(hostGID)); err != nil {
+		if err := chown.ChangeHostPathOwnership(mountPoint.PathWithoutProtectionDeferred(), false, int(hostUID), int(hostGID)); err != nil {
 			return nil, err
 		}
 	}
 
-	if mountPoint == "" {
-		var mountPointPathRoot *protectedroot.PathRoot
-		mountPointPathRoot, err = c.mount()
+	if mountPoint == nil {
+		mountPoint, err = c.mount()
 		if err != nil {
 			return nil, err
 		}
-		mountPoint = mountPointPathRoot.PathWithoutProtectionTodo()
 		defer func() {
 			if deferredErr != nil {
 				if err := c.unmount(false); err != nil {
@@ -1893,7 +1895,7 @@ func (c *Container) mountStorage(ctx context.Context) (_ *protectedroot.PathRoot
 
 	rootUID, rootGID := c.RootUID(), c.RootGID()
 
-	dirfd, err := openDirectory(mountPoint)
+	dirfd, err := openDirectory(mountPoint.PathWithoutProtectionTodo())
 	if err != nil {
 		return nil, fmt.Errorf("open mount point: %w", err)
 	}
@@ -1911,7 +1913,7 @@ func (c *Container) mountStorage(ctx context.Context) (_ *protectedroot.PathRoot
 		}
 	}
 
-	etcInTheContainerPath, err := securejoin.SecureJoin(mountPoint, "etc")
+	etcInTheContainerPath, err := mountPoint.Join("etc")
 	if err != nil {
 		return nil, fmt.Errorf("resolve /etc in the container: %w", err)
 	}
@@ -1927,7 +1929,7 @@ func (c *Container) mountStorage(ctx context.Context) (_ *protectedroot.PathRoot
 	}
 
 	tz := c.Timezone()
-	localTimePath, err := timezone.ConfigureContainerTimeZone(tz, c.state.RunDir, mountPoint, etcInTheContainerPath, c.ID())
+	localTimePath, err := timezone.ConfigureContainerTimeZone(tz, c.state.RunDir, mountPoint.PathWithoutProtectionDeferred(), etcInTheContainerPath, c.ID())
 	if err != nil {
 		return nil, fmt.Errorf("configuring timezone for container %s: %w", c.ID(), err)
 	}
@@ -1941,14 +1943,9 @@ func (c *Container) mountStorage(ctx context.Context) (_ *protectedroot.PathRoot
 		c.state.BindMounts["/etc/localtime"] = localTimePath
 	}
 
-	mountPointPathRoot, err := protectedroot.NewPathRootTodo(mountPoint)
-	if err != nil {
-		return nil, err
-	}
-
 	// Request a mount of all named volumes
 	for _, v := range c.config.NamedVolumes {
-		vol, err := c.mountNamedVolume(ctx, v, mountPointPathRoot)
+		vol, err := c.mountNamedVolume(ctx, v, *mountPoint)
 		if err != nil {
 			return nil, err
 		}
@@ -1964,7 +1961,7 @@ func (c *Container) mountStorage(ctx context.Context) (_ *protectedroot.PathRoot
 		}()
 	}
 
-	return &mountPointPathRoot, nil
+	return mountPoint, nil
 }
 
 // Mount a single named volume into the container.
