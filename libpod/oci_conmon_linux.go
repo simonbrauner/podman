@@ -42,10 +42,11 @@ func (r *ConmonOCIRuntime) createRootlessContainer(ctr *Container, restoreOption
 			}
 			defer errorhandling.CloseQuiet(fd)
 
-			rootPath, err := ctr.getRootPathForOCI()
+			rootPathRoot, err := ctr.getRootPathForOCI()
 			if err != nil {
 				return 0, err
 			}
+			rootPath := rootPathRoot.PathWithoutProtectionTodo()
 
 			// create a new mountns on the current thread
 			if err = unix.Unshare(unix.CLONE_NEWNS); err != nil {

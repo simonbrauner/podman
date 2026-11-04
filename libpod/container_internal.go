@@ -2582,15 +2582,15 @@ func (c *Container) setupOCIHooks(ctx context.Context, config *spec.Spec) (map[s
 // If the current user is mapped in the container user namespace, then it returns
 // the container's mountpoint directly from the storage.
 // Otherwise, it returns an intermediate mountpoint that is accessible to anyone.
-func (c *Container) getRootPathForOCI() (string, error) {
+func (c *Container) getRootPathForOCI() (protectedroot.PathRoot, error) {
 	if hasCurrentUserMapped(c) || c.config.RootfsMapping != nil {
-		return c.state.Mountpoint.PathWithoutProtectionTodo(), nil
+		return *c.state.Mountpoint, nil
 	}
 	return c.getIntermediateMountpointUser()
 }
 
 var (
-	intermediateMountPoint     string
+	intermediateMountPoint     *protectedroot.PathRoot
 	intermediateMountPointErr  error
 	intermediateMountPointSync sync.Mutex
 )
@@ -2599,7 +2599,7 @@ var (
 // the runroot/tmpdir used by libpod are accessible only to the owner.
 // To avoid TOCTOU issues, the path must be owned by the current user's UID and GID.
 // The path can be used by different containers, so a mount must be created only in a private mount namespace.
-func (c *Container) recreateIntermediateMountpointUser() (string, error) {
+func (c *Container) recreateIntermediateMountpointUser() (protectedroot.PathRoot, error) {
 	uid := os.Geteuid()
 	gid := os.Getegid()
 	for i := 0; ; i++ {
@@ -2611,40 +2611,43 @@ func (c *Container) recreateIntermediateMountpointUser() (string, error) {
 		err := os.Mkdir(dir, 0o755)
 		if err != nil {
 			if !errors.Is(err, os.ErrExist) {
-				return "", err
+				return protectedroot.PathRoot{}, err
 			}
 			st, err2 := os.Stat(dir)
 			if err2 != nil {
-				return "", err
+				return protectedroot.PathRoot{}, err
 			}
 			sys := st.Sys().(*syscall.Stat_t)
 			if !st.IsDir() || sys.Uid != uint32(uid) || sys.Gid != uint32(gid) {
 				continue
 			}
 		}
-		return dir, nil
+		return protectedroot.NewPathRootTodo(dir)
 	}
 }
 
 // getIntermediateMountpointUser returns a path that is accessible to everyone.
 // To avoid TOCTOU issues, the path must be owned by the current user's UID and GID.
 // The path can be used by different containers, so a mount must be created only in a private mount namespace.
-func (c *Container) getIntermediateMountpointUser() (string, error) {
+func (c *Container) getIntermediateMountpointUser() (protectedroot.PathRoot, error) {
 	intermediateMountPointSync.Lock()
 	defer intermediateMountPointSync.Unlock()
 
-	if intermediateMountPoint == "" || fileutils.Exists(intermediateMountPoint) != nil {
+	if intermediateMountPoint == nil || fileutils.Exists(intermediateMountPoint.PathWithoutProtectionDeferred()) != nil {
 		return c.recreateIntermediateMountpointUser()
 	}
 
 	// update the timestamp to prevent systemd-tmpfiles from removing it
 	now := time.Now()
-	if err := os.Chtimes(intermediateMountPoint, now, now); err != nil {
+	if err := os.Chtimes(intermediateMountPoint.PathWithoutProtection(), now, now); err != nil {
 		if !errors.Is(err, os.ErrNotExist) {
 			return c.recreateIntermediateMountpointUser()
 		}
 	}
-	return intermediateMountPoint, intermediateMountPointErr
+	if intermediateMountPointErr != nil {
+		return protectedroot.PathRoot{}, intermediateMountPointErr
+	}
+	return *intermediateMountPoint, nil
 }
 
 // mount mounts the container's root filesystem

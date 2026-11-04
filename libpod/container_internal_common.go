@@ -751,7 +751,7 @@ func (c *Container) generateSpec(ctx context.Context) (s *spec.Spec, cleanupFunc
 	if err != nil {
 		return nil, nil, err
 	}
-	g.SetRootPath(rootPath)
+	g.SetRootPath(rootPath.PathWithoutProtection())
 	g.AddAnnotation("org.opencontainers.image.stopSignal", strconv.FormatUint(uint64(c.config.StopSignal), 10))
 
 	if c.config.StopSignal != 0 {
