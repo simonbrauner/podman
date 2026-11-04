@@ -1895,7 +1895,7 @@ func (c *Container) mountStorage(ctx context.Context) (_ *protectedroot.PathRoot
 
 	rootUID, rootGID := c.RootUID(), c.RootGID()
 
-	dirfd, err := openDirectory(mountPoint.PathWithoutProtectionTodo())
+	dirfd, err := openDirectory(mountPoint.PathWithoutProtection()) // TODO replace once `PathRoot` provides opening the directory
 	if err != nil {
 		return nil, fmt.Errorf("open mount point: %w", err)
 	}
