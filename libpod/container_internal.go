@@ -2656,22 +2656,22 @@ func (c *Container) mount() (*protectedroot.PathRoot, error) {
 		return nil, fmt.Errorf("cannot mount container %s as it is being removed: %w", c.ID(), define.ErrCtrStateInvalid)
 	}
 
-	mountPoint, err := c.runtime.storageService.MountContainerImage(c.ID())
+	mountPointPath, err := c.runtime.storageService.MountContainerImage(c.ID())
 	if err != nil {
 		return nil, fmt.Errorf("mounting storage for container %s: %w", c.ID(), err)
 	}
-	mountPoint, err = filepath.EvalSymlinks(mountPoint)
+	mountPointPath, err = filepath.EvalSymlinks(mountPointPath)
 	if err != nil {
 		return nil, fmt.Errorf("resolving storage path for container %s: %w", c.ID(), err)
 	}
-	if err := idtools.SafeChown(mountPoint, c.RootUID(), c.RootGID()); err != nil {
+	mountPoint, err := protectedroot.NewPathRoot(mountPointPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create mountpoint %s for container %s: %w", mountPointPath, c.ID(), err)
+	}
+	if err := idtools.SafeChown(mountPoint.PathWithoutProtectionDeferred(), c.RootUID(), c.RootGID()); err != nil {
 		return nil, fmt.Errorf("cannot chown %s to %d:%d: %w", mountPoint, c.RootUID(), c.RootGID(), err)
 	}
-	mountPointRoot, err := protectedroot.NewPathRootTodo(mountPoint)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create mountpoint %s for container %s: %w", mountPoint, c.ID(), err)
-	}
-	return &mountPointRoot, nil
+	return &mountPoint, nil
 }
 
 // unmount unmounts the container's root filesystem
