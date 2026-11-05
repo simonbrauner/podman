@@ -2622,7 +2622,7 @@ func (c *Container) recreateIntermediateMountpointUser() (protectedroot.PathRoot
 				continue
 			}
 		}
-		return protectedroot.NewPathRootTodo(dir)
+		return protectedroot.NewPathRoot(dir)
 	}
 }
 
