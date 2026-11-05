@@ -1281,10 +1281,10 @@ func (c *Container) Stat(ctx context.Context, containerPath string) (*define.Fil
 		}
 	}
 
-	var mountPoint *protectedroot.PathRoot
+	var mountPoint protectedroot.PathRoot
 	var err error
 	if c.state.Mounted {
-		mountPoint = c.state.Mountpoint
+		mountPoint = *c.state.Mountpoint
 	} else {
 		mountPoint, err = c.mount()
 		if err != nil {

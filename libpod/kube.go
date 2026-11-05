@@ -20,6 +20,7 @@ import (
 	"go.podman.io/common/libnetwork/types"
 	"go.podman.io/common/pkg/config"
 	"go.podman.io/image/v5/manifest"
+	"go.podman.io/podman/v6/internal/protectedroot"
 	"go.podman.io/podman/v6/libpod/define"
 	"go.podman.io/podman/v6/pkg/domain/entities"
 	"go.podman.io/podman/v6/pkg/env"
@@ -1442,8 +1443,10 @@ func generateKubeSecurityContext(c *Container) (*v1.SecurityContext, bool, error
 			return nil, false, fmt.Errorf("unable to sync container during YAML generation: %w", err)
 		}
 
-		mountpoint := c.state.Mountpoint
-		if mountpoint == nil {
+		var mountpoint protectedroot.PathRoot
+		if c.state.Mounted {
+			mountpoint = *c.state.Mountpoint
+		} else {
 			var err error
 			mountpoint, err = c.mount()
 			if err != nil {
@@ -1457,7 +1460,7 @@ func generateKubeSecurityContext(c *Container) (*v1.SecurityContext, bool, error
 		}
 		logrus.Debugf("Looking in container for user: %s", c.User())
 
-		execUser, err := lookup.GetUserGroupInfo(*mountpoint, c.User(), nil)
+		execUser, err := lookup.GetUserGroupInfo(mountpoint, c.User(), nil)
 		if err != nil {
 			return nil, false, err
 		}

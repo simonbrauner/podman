@@ -1796,7 +1796,7 @@ func (c *Container) mountStorage(ctx context.Context) (_ *protectedroot.PathRoot
 
 	// We need to mount the container before volumes - to ensure the copyup
 	// works properly.
-	mountPoint, err := protectedroot.NewOptionalPathRootDeferred(c.config.Rootfs)
+	mountPointOptional, err := protectedroot.NewOptionalPathRootDeferred(c.config.Rootfs)
 	if err != nil {
 		return nil, err
 	}
@@ -1857,14 +1857,14 @@ func (c *Container) mountStorage(ctx context.Context) (_ *protectedroot.PathRoot
 			}
 		}
 
-		var mp protectedroot.PathRoot
-		mp, err = protectedroot.NewPathRootDeferred(overlayMount.Source)
+		var mountPoint protectedroot.PathRoot
+		mountPoint, err = protectedroot.NewPathRootDeferred(overlayMount.Source)
 		if err != nil {
 			return nil, err
 		}
-		mountPoint = &mp
+		mountPointOptional = &mountPoint
 
-		execUser, err := lookup.GetUserGroupInfo(*mountPoint, c.config.User, nil)
+		execUser, err := lookup.GetUserGroupInfo(mountPoint, c.config.User, nil)
 		if err != nil {
 			return nil, err
 		}
@@ -1879,7 +1879,10 @@ func (c *Container) mountStorage(ctx context.Context) (_ *protectedroot.PathRoot
 		}
 	}
 
-	if mountPoint == nil {
+	var mountPoint protectedroot.PathRoot
+	if mountPointOptional != nil {
+		mountPoint = *mountPointOptional
+	} else {
 		mountPoint, err = c.mount()
 		if err != nil {
 			return nil, err
@@ -1945,7 +1948,7 @@ func (c *Container) mountStorage(ctx context.Context) (_ *protectedroot.PathRoot
 
 	// Request a mount of all named volumes
 	for _, v := range c.config.NamedVolumes {
-		vol, err := c.mountNamedVolume(ctx, v, *mountPoint)
+		vol, err := c.mountNamedVolume(ctx, v, mountPoint)
 		if err != nil {
 			return nil, err
 		}
@@ -1961,7 +1964,7 @@ func (c *Container) mountStorage(ctx context.Context) (_ *protectedroot.PathRoot
 		}()
 	}
 
-	return mountPoint, nil
+	return &mountPoint, nil
 }
 
 // Mount a single named volume into the container.
@@ -2651,27 +2654,27 @@ func (c *Container) getIntermediateMountpointUser() (protectedroot.PathRoot, err
 }
 
 // mount mounts the container's root filesystem
-func (c *Container) mount() (*protectedroot.PathRoot, error) {
+func (c *Container) mount() (protectedroot.PathRoot, error) {
 	if c.state.State == define.ContainerStateRemoving {
-		return nil, fmt.Errorf("cannot mount container %s as it is being removed: %w", c.ID(), define.ErrCtrStateInvalid)
+		return protectedroot.PathRoot{}, fmt.Errorf("cannot mount container %s as it is being removed: %w", c.ID(), define.ErrCtrStateInvalid)
 	}
 
 	mountPointPath, err := c.runtime.storageService.MountContainerImage(c.ID())
 	if err != nil {
-		return nil, fmt.Errorf("mounting storage for container %s: %w", c.ID(), err)
+		return protectedroot.PathRoot{}, fmt.Errorf("mounting storage for container %s: %w", c.ID(), err)
 	}
 	mountPointPath, err = filepath.EvalSymlinks(mountPointPath)
 	if err != nil {
-		return nil, fmt.Errorf("resolving storage path for container %s: %w", c.ID(), err)
+		return protectedroot.PathRoot{}, fmt.Errorf("resolving storage path for container %s: %w", c.ID(), err)
 	}
 	mountPoint, err := protectedroot.NewPathRoot(mountPointPath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create mountpoint %s for container %s: %w", mountPointPath, c.ID(), err)
+		return protectedroot.PathRoot{}, fmt.Errorf("failed to create mountpoint %s for container %s: %w", mountPointPath, c.ID(), err)
 	}
 	if err := idtools.SafeChown(mountPoint.PathWithoutProtectionDeferred(), c.RootUID(), c.RootGID()); err != nil {
-		return nil, fmt.Errorf("cannot chown %s to %d:%d: %w", mountPoint, c.RootUID(), c.RootGID(), err)
+		return protectedroot.PathRoot{}, fmt.Errorf("cannot chown %s to %d:%d: %w", mountPoint, c.RootUID(), c.RootGID(), err)
 	}
-	return &mountPoint, nil
+	return mountPoint, nil
 }
 
 // unmount unmounts the container's root filesystem
